@@ -138,8 +138,8 @@ def main():
             from experiments.run_marl import run_marl_experiment
             run_marl_experiment()
         elif args.mode == "hybrid":
-            from experiments.run_hybrid import run_hybrid_benchmark
-            run_hybrid_benchmark()
+            from experiments.run_hybrid import run_hybrid_comparison
+            run_hybrid_comparison()
         elif args.mode in ("smoke_test", "server"):
             if not args.mock and (not match_id or not token):
                 print("\n[ERROR] Missing PROCON_MATCH_ID or PROCON_TOKEN.")

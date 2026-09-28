@@ -30,35 +30,53 @@ class StateEncoder:
             return 2
         return 3
 
+    def get_cost_bucket(self, cost: float) -> int:
+        """Bucket DP cost-to-go: 0 (<=2.0), 1 (2.1-5.0), 2 (5.1-9.0), 3 (>=9.1 or unreachable)."""
+        if cost <= 2.0:
+            return 0
+        elif cost <= 5.0:
+            return 1
+        elif cost <= 9.0:
+            return 2
+        return 3
+
     def encode_agent_state(
         self,
         agent: EnvAgent,
         sim_state: SimulationState,
         other_assignments: Optional[Dict[int, int]] = None,
+        cost_to_go: Optional[Dict[int, float]] = None,
     ) -> Tuple[Any, ...]:
-        """Encode state with local position, fuel, distances to available targets, and teammate actions.
+        """Encode state with local position, fuel, distances/costs to available targets, and teammate actions.
         
         Features:
         - agent_kind: 0 (Patrol) or 1 (Refuel)
         - fuel_bucket: 0, 1, 2
-        - distances to top 2 closest active targets: (d1, d2)
+        - distances/cost-to-go to top 2 closest active targets: (d1, d2)
         - other_teammate_assignment: action chosen by other agent in previous step
         """
         fuel_b = self.get_fuel_bucket(agent.fuel, agent.max_fuel)
         agent_coord = HexCoord.from_index(agent.pos, sim_state.grid.width)
 
-        # Distances to top 2 spots with remaining stock
-        distances = []
+        # Distances or DP cost-to-go to top 2 spots with remaining stock
+        distances: List[float] = []
         for spot in sim_state.spots:
-            if spot.current_stock > 0:
-                s_coord = HexCoord.from_index(spot.pos, sim_state.grid.width)
-                distances.append(agent_coord.distance_to(s_coord))
+            if spot.current_stock > 0 and sim_state.grid.is_passable(spot.pos):
+                if cost_to_go is not None and spot.pos in cost_to_go:
+                    distances.append(cost_to_go[spot.pos])
+                else:
+                    s_coord = HexCoord.from_index(spot.pos, sim_state.grid.width)
+                    distances.append(float(agent_coord.distance_to(s_coord)))
             else:
-                distances.append(99)
+                distances.append(99.0)
 
         distances.sort()
-        d1 = self.get_dist_bucket(distances[0]) if len(distances) > 0 else 3
-        d2 = self.get_dist_bucket(distances[1]) if len(distances) > 1 else 3
+        if cost_to_go is not None:
+            d1 = self.get_cost_bucket(distances[0]) if len(distances) > 0 else 3
+            d2 = self.get_cost_bucket(distances[1]) if len(distances) > 1 else 3
+        else:
+            d1 = self.get_dist_bucket(int(distances[0])) if len(distances) > 0 else 3
+            d2 = self.get_dist_bucket(int(distances[1])) if len(distances) > 1 else 3
 
         # Teammate assignment feature for coordination
         other_act = -1
@@ -75,3 +93,4 @@ class StateEncoder:
             d2,
             other_act,
         )
+

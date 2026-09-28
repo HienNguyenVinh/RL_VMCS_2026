@@ -287,5 +287,14 @@ python -m unittest discover tests
   - [x] Thí nghiệm so sánh: IQL có phạt xung đột vs IQL thuần vs Random Baseline
   - [x] Giảm thiểu tỷ lệ tranh chấp mục tiêu và nâng cao điểm số toàn đội
   - [x] Vẽ và lưu đồ thị hội tụ phần thưởng và đồ thị giảm thiểu xung đột (`plots/marl_coordination_curve.png`)
-- [ ] **PHASE 7 — Kết hợp MARL + DP (Hierarchical Strategy)**
+- [x] **PHASE 7 — Kết hợp MARL + DP (Hierarchical Strategy)**
+  - [x] Kiến trúc phân cấp hai tầng: MARL (IQL) phân công mục tiêu vĩ mô, DP (Value Iteration) quy hoạch đường đi vi mô tối ưu
+  - [x] Tích hợp hàm giá trị DP cost-to-go vào quan sát của StateEncoder để hỗ trợ quyết định
+  - [x] Cơ chế phát hiện mục tiêu bất khả thi (impossible targets) và chiến lược Fallback phân tầng (Dijkstra -> Stand still)
+  - [x] Cơ chế kiểm soát nhiên liệu (fuel validation) tự động cắt ngắn lộ trình khi cạn pin và đệm hành động `-1` (`Direction.STAY`)
+  - [x] Đầy đủ 5 phương pháp so sánh: B0 (Random), B1 (Greedy+Dijkstra), B2 (Greedy+DP), B3 (IQL+Dijkstra), và Proposed (Hybrid MARL+DP)
+  - [x] Thử nghiệm đa hạt giống độc lập (Seeds 42, 101, 777, 999): Proposed đạt điểm cao nhất (**23.8 ± 2.2**), tiết kiệm nhiên liệu vượt trội (**29.5 fuel** so với 51.2 của B3) và độ trễ ra quyết định an toàn (**~497 ms/ngày** < 1000ms)
+  - [x] Vẽ và lưu đồ thị so sánh 4 chiều: [`plots/hybrid_comparison.png`](file:///d:/PythonProject/procon/plots/hybrid_comparison.png)
+  - [x] Lệnh chạy trực tiếp: `python main.py --mode hybrid`
 - [ ] **PHASE 8 — Fuel / Refueling & Tournament Experiments**
+

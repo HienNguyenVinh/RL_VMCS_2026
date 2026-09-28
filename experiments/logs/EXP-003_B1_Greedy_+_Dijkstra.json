@@ -1,0 +1,20 @@
+{
+  "run_id": "EXP-003_B1_Greedy_+_Dijkstra",
+  "timestamp": "2026-09-28T21:35:17.299337",
+  "phase": 7,
+  "method": "B1 (Greedy + Dijkstra)",
+  "seeds": [
+    42,
+    101,
+    777,
+    999
+  ],
+  "num_days": 5,
+  "score_mean": 10.0,
+  "score_std": 0.0,
+  "conflict_mean": 48.75,
+  "conflict_std": 30.177599308096063,
+  "fuel_mean": 6.75,
+  "fuel_std": 3.2691742076555053,
+  "latency_mean": 0.9227549999650364
+}

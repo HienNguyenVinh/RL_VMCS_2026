@@ -35,11 +35,14 @@ class TabularQAgent:
             return tuple(state)
         return state
 
-    def get_q_values(self, state: Any) -> List[float]:
-        """Get or initialize Q-values for a given discrete state."""
+    def get_q_values(self, state: Any, min_size: int = 0) -> List[float]:
+        """Get or initialize Q-values for a given discrete state, ensuring at least min_size entries."""
         key = self._state_key(state)
+        target_size = max(self.action_space_size, min_size)
         if key not in self.q_table:
-            self.q_table[key] = [0.0] * self.action_space_size
+            self.q_table[key] = [0.0] * target_size
+        elif len(self.q_table[key]) < target_size:
+            self.q_table[key].extend([0.0] * (target_size - len(self.q_table[key])))
         return self.q_table[key]
 
     def select_action(self, state: Any, legal_actions: Optional[List[int]] = None) -> int:
@@ -53,7 +56,8 @@ class TabularQAgent:
             return random.choice(actions)
 
         # Exploitation
-        q_vals = self.get_q_values(state)
+        max_action = max(actions)
+        q_vals = self.get_q_values(state, min_size=max_action + 1)
         best_val = -float("inf")
         best_actions = []
 
@@ -76,7 +80,7 @@ class TabularQAgent:
         key = self._state_key(state)
         next_key = self._state_key(next_state)
 
-        curr_q = self.get_q_values(key)[action]
+        curr_q = self.get_q_values(key, min_size=action + 1)[action]
         next_max_q = 0.0 if done else max(self.get_q_values(next_key))
 
         td_target = reward + self.gamma * next_max_q
@@ -84,6 +88,7 @@ class TabularQAgent:
         self.q_table[key][action] = curr_q + self.lr * td_error
 
         return td_error
+
 
     def decay_epsilon(self) -> None:
         """Decay exploration rate epsilon."""

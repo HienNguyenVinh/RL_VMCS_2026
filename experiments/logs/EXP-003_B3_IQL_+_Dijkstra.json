@@ -1,0 +1,20 @@
+{
+  "run_id": "EXP-003_B3_IQL_+_Dijkstra",
+  "timestamp": "2026-09-28T21:35:17.308124",
+  "phase": 7,
+  "method": "B3 (IQL + Dijkstra)",
+  "seeds": [
+    42,
+    101,
+    777,
+    999
+  ],
+  "num_days": 5,
+  "score_mean": 21.25,
+  "score_std": 4.14578098794425,
+  "conflict_mean": 7.75,
+  "conflict_std": 6.299801584177076,
+  "fuel_mean": 51.25,
+  "fuel_std": 13.160072188251856,
+  "latency_mean": 7.552135000037197
+}

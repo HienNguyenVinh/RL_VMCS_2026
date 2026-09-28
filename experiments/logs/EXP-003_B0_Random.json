@@ -1,0 +1,20 @@
+{
+  "run_id": "EXP-003_B0_Random",
+  "timestamp": "2026-09-28T21:35:17.292892",
+  "phase": 7,
+  "method": "B0 (Random)",
+  "seeds": [
+    42,
+    101,
+    777,
+    999
+  ],
+  "num_days": 5,
+  "score_mean": 7.5,
+  "score_std": 5.5901699437494745,
+  "conflict_mean": 0.5,
+  "conflict_std": 0.8660254037844386,
+  "fuel_mean": 75.75,
+  "fuel_std": 1.7853571071357126,
+  "latency_mean": 0.8932299999287352
+}

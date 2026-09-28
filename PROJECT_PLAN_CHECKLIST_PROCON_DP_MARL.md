@@ -593,17 +593,17 @@ POST /actions
 
 ### Checklist
 
-- [ ] Tạo candidate tasks.
-- [ ] Tính DP cost-to-go đến từng task.
-- [ ] Đưa cost-to-go vào observation.
-- [ ] MARL chọn assignment.
-- [ ] DP tạo route.
-- [ ] Convert route sang direction 0..5.
-- [ ] Pad bằng `-1` nếu cần.
-- [ ] Validate `daySteps`.
-- [ ] Validate fuel.
-- [ ] Detect impossible target.
-- [ ] Fallback strategy khi planner fail.
+- [x] Tạo candidate tasks.
+- [x] Tính DP cost-to-go đến từng task.
+- [x] Đưa cost-to-go vào observation.
+- [x] MARL chọn assignment.
+- [x] DP tạo route.
+- [x] Convert route sang direction 0..5.
+- [x] Pad bằng `-1` nếu cần.
+- [x] Validate `daySteps`.
+- [x] Validate fuel.
+- [x] Detect impossible target.
+- [x] Fallback strategy khi planner fail.
 
 ### Fallback
 
@@ -617,9 +617,9 @@ Nếu MARL / DP không đưa ra action hợp lệ:
 
 ### Definition of Done
 
-- [ ] Hybrid chạy hết episode offline.
-- [ ] Không phát sinh invalid action.
-- [ ] Hybrid tốt hơn ít nhất một baseline trên một số metric rõ ràng.
+- [x] Hybrid chạy hết episode offline.
+- [x] Không phát sinh invalid action.
+- [x] Hybrid tốt hơn ít nhất một baseline trên một số metric rõ ràng (Score: 23.8 vs B1: 10.0, Fuel: 29.5 vs B3: 51.2).
 
 ---
 
@@ -716,7 +716,7 @@ Random task
 Random valid movement
 ```
 
-- [ ] Implement.
+- [x] Implement.
 
 ### B1 — Greedy + Dijkstra
 
@@ -726,7 +726,7 @@ Nearest / highest-score task
 Dijkstra
 ```
 
-- [ ] Implement.
+- [x] Implement.
 
 ### B2 — Greedy + DP
 
@@ -736,7 +736,7 @@ Greedy task allocation
 Value Iteration
 ```
 
-- [ ] Implement.
+- [x] Implement.
 
 ### B3 — IQL + Dijkstra
 
@@ -746,7 +746,7 @@ MARL task allocation
 Dijkstra
 ```
 
-- [ ] Implement.
+- [x] Implement.
 
 ### Proposed — IQL + DP
 
@@ -756,7 +756,7 @@ MARL task allocation
 Dynamic Programming
 ```
 
-- [ ] Implement.
+- [x] Implement.
 
 ---
 
@@ -772,14 +772,14 @@ Dynamic Programming
 
 ### Checklist
 
-- [ ] Cùng map / seed.
-- [ ] Cùng số agent.
-- [ ] Cùng số ngày.
-- [ ] Cùng reward definition.
-- [ ] Chạy nhiều independent seeds.
-- [ ] Báo mean.
-- [ ] Báo std.
-- [ ] Lưu raw results.
+- [x] Cùng map / seed.
+- [x] Cùng số agent.
+- [x] Cùng số ngày.
+- [x] Cùng reward definition.
+- [x] Chạy nhiều independent seeds.
+- [x] Báo mean.
+- [x] Báo std.
+- [x] Lưu raw results.
 
 ---
 

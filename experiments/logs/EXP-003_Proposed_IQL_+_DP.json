@@ -1,0 +1,20 @@
+{
+  "run_id": "EXP-003_Proposed_IQL_+_DP",
+  "timestamp": "2026-09-28T21:35:17.315948",
+  "phase": 7,
+  "method": "Proposed (IQL + DP)",
+  "seeds": [
+    42,
+    101,
+    777,
+    999
+  ],
+  "num_days": 5,
+  "score_mean": 23.75,
+  "score_std": 2.165063509461097,
+  "conflict_mean": 16.5,
+  "conflict_std": 15.14100392972672,
+  "fuel_mean": 29.5,
+  "fuel_std": 8.440971508067067,
+  "latency_mean": 497.13533000003736
+}
