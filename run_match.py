@@ -80,6 +80,10 @@ def get_web_match_urls(base_url: str, match_id: str) -> list:
 
 def resolve_match_token(match_id: str, cli_token: str = None) -> str:
     """Xác định token hợp lệ cho trận đấu, có kiểm tra tiền tố và hỏi người dùng nếu thiếu."""
+    # 0. Nếu là mock mode
+    if match_id.startswith("mock"):
+        return "mock_token"
+
     # 1. Người dùng truyền trực tiếp qua CLI (-t / --token)
     if cli_token and cli_token.strip():
         return cli_token.strip()
@@ -93,7 +97,7 @@ def resolve_match_token(match_id: str, cli_token: str = None) -> str:
     if env_token:
         # Nếu env_token là token của trận khác (vd m-32743-a-...), cảnh báo không dùng nhầm!
         if env_token.startswith("m-") and not env_token.startswith(f"{match_id}-"):
-            print(f"⚠️  CẢNH BÁO: Token trong .env ({env_token[:12]}...) là của trận khác, không thể dùng cho trận [{match_id}].")
+            print(f"⚠️  CẢNH BÁO: Token trong môi trường ({env_token[:12]}...) là của trận khác, không dùng cho trận [{match_id}].")
         else:
             return env_token
 
@@ -103,7 +107,7 @@ def resolve_match_token(match_id: str, cli_token: str = None) -> str:
     print(f"   - Mở web https://procon.ptit.edu.vn và tìm trận [{match_id}].")
     print(f"   - Copy 'Token riêng trận' (hoặc copy chuỗi sau '-token' trong lệnh mẫu: sample-bot ... -token <TOKEN>)")
     
-    prompt_token = input(f"\n👉 Dán Token cho trận {match_id} vào đây (hoặc nhấn Enter để thử dùng Team Token mặc định): ").strip()
+    prompt_token = input(f"\n👉 Dán Token cho trận {match_id} vào đây: ").strip()
     if prompt_token:
         return prompt_token
 
@@ -221,24 +225,25 @@ def play_match(
 
     except KeyboardInterrupt:
         print("\n[!] Người dùng đã hủy thực thi bot.")
-    except ProconAuthError:
-        print("\n" + "=" * 80)
-        print("❌ LỖI XÁC THỰC (HTTP 401 UNAUTHORIZED)")
-        print("=" * 80)
-        print(f"Nguyên nhân: Token bạn đang dùng không có quyền truy cập vào trận [{match_id}].")
-        print(f"Mỗi trận đấu trên web PROCON có một Token riêng biệt (thường bắt đầu bằng: {match_id}-a-...).")
-        print("\n👉 CÁCH KHẮC PHỤC:")
-        print(f"1. Vào trang web: https://procon.ptit.edu.vn")
-        print(f"2. Tìm trận [{match_id}] trong bảng 'Các trận của đội' hoặc 'Luyện tập với máy'.")
-        print(f"3. Copy giá trị trong cột 'Token riêng trận' (hoặc copy chuỗi sau '-token' trong lệnh mẫu).")
-        print(f"4. Chạy lại lệnh với tham số -t:")
-        print(f"   python run_match.py -m {match_id} -t <TOKEN_CỦA_TRẬN_{match_id}>")
-        print("=" * 80 + "\n")
-    except Exception as e:
-        print(f"\n❌ LỖI TRONG QUÁ TRÌNH KẾT NỐI HOẶC THI ĐẤU: {e}")
-        print("💡 Gợi ý xử lý:")
-        print("   1. Kiểm tra xem Token và Match ID đã chính xác với trang thi đấu chưa.")
-        print("   2. Kiểm tra kết nối mạng hoặc thử chạy offline với cờ --mock để kiểm tra thuật toán.")
+    except (ProconAuthError, Exception) as e:
+        if isinstance(e, ProconAuthError) or "401" in str(e) or "Unauthorized" in str(e):
+            print("\n" + "=" * 80)
+            print("❌ LỖI XÁC THỰC (HTTP 401 UNAUTHORIZED)")
+            print("=" * 80)
+            print(f"Nguyên nhân: Token đang dùng không có quyền truy cập vào trận [{match_id}].")
+            print(f"Mỗi trận đấu trên server PROCON có một Token riêng biệt (thường bắt đầu bằng: {match_id}-a-...).")
+            print("\n👉 CÁCH KHẮC PHỤC:")
+            print(f"1. Vào trang web: https://procon.ptit.edu.vn")
+            print(f"2. Tìm trận [{match_id}] trong danh sách 'Các trận của đội' hoặc 'Luyện tập với máy'.")
+            print(f"3. Copy 'Token riêng trận' (hoặc copy chuỗi sau '-token' trong lệnh mẫu: sample-bot ... -token <TOKEN>).")
+            print(f"4. Chạy lại lệnh với tham số -t:")
+            print(f"   python run_match.py -m {match_id} -t <DÁN_TOKEN_VÀO_ĐÂY>")
+            print("=" * 80 + "\n")
+        else:
+            print(f"\n❌ LỖI TRONG QUÁ TRÌNH KẾT NỐI HOẶC THI ĐẤU: {e}")
+            print("💡 Gợi ý xử lý:")
+            print("   1. Kiểm tra xem Token và Match ID đã chính xác với trang thi đấu chưa.")
+            print("   2. Kiểm tra kết nối mạng hoặc thử chạy offline với cờ --mock để kiểm tra thuật toán.")
     finally:
         if mock_server:
             mock_server.stop()
