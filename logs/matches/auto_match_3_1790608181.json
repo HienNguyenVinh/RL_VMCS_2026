@@ -1,0 +1,185 @@
+{
+  "match_id": "auto_match_3_1790608181",
+  "timestamp": "2026-09-28T22:09:44.180810",
+  "summary": {
+    "match_id": "auto_match_3_1790608181",
+    "days_played": 3,
+    "total_time_seconds": 2.56,
+    "winner": "Our Team",
+    "scores": {
+      "our_team": 120,
+      "opponent": 80
+    },
+    "success": true
+  },
+  "telemetry": [
+    {
+      "day": 1,
+      "agents": [
+        {
+          "id": 0,
+          "kind": "Patrol",
+          "pos": 0,
+          "fuel": 50,
+          "score": 10
+        },
+        {
+          "id": 1,
+          "kind": "Patrol",
+          "pos": 10,
+          "fuel": 45,
+          "score": 5
+        },
+        {
+          "id": 2,
+          "kind": "Refuel",
+          "pos": 20,
+          "fuel": 90,
+          "score": 0
+        }
+      ],
+      "actions": [
+        [
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        [
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        [
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ]
+      ],
+      "planning_latency_ms": 134.54,
+      "plan_source": "hybrid_marl_dp",
+      "server_response": {
+        "status": "accepted",
+        "finished": false
+      },
+      "timestamp": "2026-09-28T22:09:42.902519"
+    },
+    {
+      "day": 2,
+      "agents": [
+        {
+          "id": 0,
+          "kind": "Patrol",
+          "pos": 0,
+          "fuel": 50,
+          "score": 10
+        },
+        {
+          "id": 1,
+          "kind": "Patrol",
+          "pos": 10,
+          "fuel": 45,
+          "score": 5
+        },
+        {
+          "id": 2,
+          "kind": "Refuel",
+          "pos": 20,
+          "fuel": 90,
+          "score": 0
+        }
+      ],
+      "actions": [
+        [
+          2,
+          2,
+          3,
+          -1,
+          -1
+        ],
+        [
+          2,
+          2,
+          -1,
+          -1,
+          -1
+        ],
+        [
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ]
+      ],
+      "planning_latency_ms": 98.86,
+      "plan_source": "hybrid_marl_dp",
+      "server_response": {
+        "status": "accepted",
+        "finished": false
+      },
+      "timestamp": "2026-09-28T22:09:43.419387"
+    },
+    {
+      "day": 3,
+      "agents": [
+        {
+          "id": 0,
+          "kind": "Patrol",
+          "pos": 0,
+          "fuel": 50,
+          "score": 10
+        },
+        {
+          "id": 1,
+          "kind": "Patrol",
+          "pos": 10,
+          "fuel": 45,
+          "score": 5
+        },
+        {
+          "id": 2,
+          "kind": "Refuel",
+          "pos": 20,
+          "fuel": 90,
+          "score": 0
+        }
+      ],
+      "actions": [
+        [
+          2,
+          2,
+          3,
+          -1,
+          -1
+        ],
+        [
+          2,
+          2,
+          -1,
+          -1,
+          -1
+        ],
+        [
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ]
+      ],
+      "planning_latency_ms": 116.32,
+      "plan_source": "hybrid_marl_dp",
+      "server_response": {
+        "status": "accepted",
+        "finished": true
+      },
+      "timestamp": "2026-09-28T22:09:43.940816"
+    }
+  ]
+}

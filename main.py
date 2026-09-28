@@ -74,7 +74,7 @@ def main():
     parser = argparse.ArgumentParser(description="PTIT PROCON 2026 DP-MARL Bot")
     parser.add_argument(
         "--mode",
-        choices=["demo", "baseline", "dp", "single_rl", "marl", "hybrid", "tournament", "refuel", "server", "smoke_test"],
+        choices=["demo", "baseline", "dp", "single_rl", "marl", "hybrid", "tournament", "refuel", "automation", "server", "smoke_test"],
         default="demo",
         help="Execution mode (default: demo)",
     )
@@ -143,16 +143,20 @@ def main():
         elif args.mode in ("tournament", "refuel"):
             from experiments.run_tournament import run_refuel_tournament
             run_refuel_tournament()
+        elif args.mode == "automation":
+            from experiments.run_real_server_test import run_match_automation
+            run_match_automation(num_matches=3, use_mock=args.mock or not (match_id and token), token=token)
 
         elif args.mode in ("smoke_test", "server"):
             if not args.mock and (not match_id or not token):
                 print("\n[ERROR] Missing PROCON_MATCH_ID or PROCON_TOKEN.")
                 print("Please create a .env file from .env.example with your credentials,")
-                print("or test with the mock server using: python main.py --mode smoke_test --mock")
+                print("or test with the mock server using: python main.py --mode server --mock")
                 sys.exit(1)
 
             from client.http_client import ProconHttpClient
             from client.runner import MatchRunner
+            from client.protocol import create_idle_action_plan
 
             client = ProconHttpClient(
                 base_url=base_url,
@@ -161,10 +165,13 @@ def main():
                 min_poll_interval=float(config.get("server", {}).get("poll_interval", 0.25)),
             )
 
-            # In smoke_test mode: strategy is None -> all agents stay still ([-1] * daySteps)
-            runner = MatchRunner(client=client, strategy_fn=None if args.mode == "smoke_test" else None)
+            # In smoke_test mode: all agents stay still ([-1] * daySteps)
+            # In server mode: strategy=None auto-initializes HybridMARLDPStrategy with refueling
+            strategy = (lambda s, st: create_idle_action_plan(s.num_agents, s.day_steps)) if args.mode == "smoke_test" else None
+            runner = MatchRunner(client=client, strategy=strategy)
             outcome = runner.run()
-            print(f"\n[PHASE 1 COMPLETE] Match finished: {outcome}")
+            print(f"\n[MATCH COMPLETE] Match finished: {outcome}")
+
 
     finally:
         if mock_server:

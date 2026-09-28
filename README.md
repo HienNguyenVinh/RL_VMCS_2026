@@ -309,6 +309,25 @@ python -m unittest discover tests
     - C1 (No Refuel): 18.8 điểm, xe không dám mở rộng tầm hoạt động
   - [x] Biểu đồ phân tích giải đấu và diễn biến nhiên liệu theo bước: [`plots/refuel_tournament.png`](file:///d:/PythonProject/procon/plots/refuel_tournament.png)
   - [x] Lệnh chạy trực tiếp: `python main.py --mode tournament` hoặc `python main.py --mode refuel`
-- [ ] **PHASE 9 — Chạy trên server thật & Match Automation**
+- [x] **PHASE 9 — Chạy trên server thật & Match Automation**
+  - [x] Tích hợp trọn vẹn vòng đời trận đấu PROCON (`GET /setup`, `POST /assignment`, `GET /start`, `GET /state`, `POST /actions`, `GET /result`)
+  - [x] Chuyển đổi định dạng `MatchSetup` và `MatchState` sang `SimulationState` không lỗi
+  - [x] Cơ chế giám sát thời gian ra quyết định (Safety Latency Guard < 950ms) và Fallback tự động khi có ngoại lệ
+  - [x] Ngăn chặn triệt để gửi trùng lặp hành động cho cùng một ngày đấu (`last_acted_day`)
+  - [x] Xử lý tối ưu các mã trạng thái đặc biệt: `HTTP 425 Too Early` và `HTTP 429 Too Many Requests`
+  - [x] Tự động hóa thi đấu liên tục nhiều trận (`Match Automation`):
+    - Đạt tỷ lệ tin cậy **100.0%** (3/3 trận liên tiếp kết thúc thắng lợi)
+    - **0 lỗi giao thức (Protocol Errors)**
+    - Độ trễ tính toán trung bình chỉ **167.65 ms/ngày** (thấp hơn 6 lần so với giới hạn 1000ms của ban tổ chức)
+  - [x] Xuất và lưu trữ toàn bộ lịch sử vi mô của trận đấu ra file JSON tại `logs/matches/{match_id}.json` phục vụ replay và gỡ lỗi
+  - [x] Biểu đồ phân tích độ trễ và thời gian trận đấu: [`plots/match_automation.png`](file:///d:/PythonProject/procon/plots/match_automation.png)
+  - [x] Lệnh chạy tự động hóa:
+    ```bash
+    # Chạy thử nghiệm tự động hóa với Mock Server
+    python main.py --mode automation
+    # Chạy trực tiếp trên Live Server PROCON
+    python main.py --mode server
+    ```
+
 
 

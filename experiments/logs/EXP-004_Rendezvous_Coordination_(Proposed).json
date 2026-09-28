@@ -1,6 +1,6 @@
 {
   "run_id": "EXP-004_Rendezvous_Coordination_(Proposed)",
-  "timestamp": "2026-09-28T21:48:11.951990",
+  "timestamp": "2026-09-28T22:06:28.926775",
   "phase": 8,
   "config": "C3: Rendezvous Coordination (Proposed)",
   "seeds": [
@@ -10,10 +10,10 @@
     999
   ],
   "num_days": 8,
-  "score_mean": 23.75,
-  "score_std": 7.39509972887452,
-  "transferred_mean": 27.5,
-  "transferred_std": 9.420721840708387,
+  "score_mean": 12.5,
+  "score_std": 4.330127018922194,
+  "transferred_mean": 12.75,
+  "transferred_std": 10.133484099755622,
   "starvation_mean": 0.0,
   "starvation_std": 0.0,
   "stranded_mean": 0.0

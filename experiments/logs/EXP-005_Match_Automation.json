@@ -1,0 +1,12 @@
+{
+  "run_id": "EXP-005_Match_Automation",
+  "timestamp": "2026-09-28T22:09:46.222407",
+  "phase": 9,
+  "num_matches": 3,
+  "use_mock": true,
+  "total_matches": 3,
+  "success_rate": 100.0,
+  "protocol_errors": 0,
+  "mean_latency_ms": 167.6533333333333,
+  "max_latency_ms": 253.9
+}
