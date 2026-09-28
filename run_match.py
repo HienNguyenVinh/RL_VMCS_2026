@@ -1,16 +1,16 @@
 """PTIT PROCON 2026 — Trình thực thi thi đấu và xem kết quả trực tiếp trên Web.
 
 Cách dùng nhanh:
-1. Chạy tương tác (tự chọn trận):
+1. Chạy tương tác (tự chọn trận hoặc dán ID trận mới):
    python run_match.py
 
-2. Chạy với ID trận cụ thể:
+2. Chạy với ID trận cụ thể và Token tương ứng:
+   python run_match.py -m m-32744 -t <TOKEN_CỦA_TRẬN_32744>
+
+3. Chạy với trận có sẵn trong danh bạ:
    python run_match.py -m m-32743
 
-3. Chạy với ID trận và token riêng:
-   python run_match.py -m m-32742 -t m-32742-a-b32726021325
-
-4. Chạy thử với Mock Server nội bộ:
+4. Chạy thử với Mock Server nội bộ (Offline Test):
    python run_match.py --mock
 """
 import argparse
@@ -37,6 +37,7 @@ except ImportError:
 
 from client.http_client import ProconHttpClient
 from client.mock_server import MockProconServer
+from client.protocol import ProconAuthError
 from client.runner import MatchRunner
 from env.hex_grid import HexGrid
 from strategy.hybrid import HybridMARLDPStrategy
@@ -77,12 +78,45 @@ def get_web_match_urls(base_url: str, match_id: str) -> list:
     ]
 
 
+def resolve_match_token(match_id: str, cli_token: str = None) -> str:
+    """Xác định token hợp lệ cho trận đấu, có kiểm tra tiền tố và hỏi người dùng nếu thiếu."""
+    # 1. Người dùng truyền trực tiếp qua CLI (-t / --token)
+    if cli_token and cli_token.strip():
+        return cli_token.strip()
+
+    # 2. Trận đấu có sẵn trong danh bạ đã lưu
+    if match_id in KNOWN_MATCH_TOKENS:
+        return KNOWN_MATCH_TOKENS[match_id]
+
+    # 3. Kiểm tra biến môi trường PROCON_TOKEN
+    env_token = os.getenv("PROCON_TOKEN", "").strip()
+    if env_token:
+        # Nếu env_token là token của trận khác (vd m-32743-a-...), cảnh báo không dùng nhầm!
+        if env_token.startswith("m-") and not env_token.startswith(f"{match_id}-"):
+            print(f"⚠️  CẢNH BÁO: Token trong .env ({env_token[:12]}...) là của trận khác, không thể dùng cho trận [{match_id}].")
+        else:
+            return env_token
+
+    # 4. Yêu cầu người dùng dán token của trận
+    print(f"\n🔑 Trận đấu [{match_id}] là trận mới, cần Token riêng của trận để xác thực.")
+    print(f"💡 Hướng dẫn lấy token:")
+    print(f"   - Mở web https://procon.ptit.edu.vn và tìm trận [{match_id}].")
+    print(f"   - Copy 'Token riêng trận' (hoặc copy chuỗi sau '-token' trong lệnh mẫu: sample-bot ... -token <TOKEN>)")
+    
+    prompt_token = input(f"\n👉 Dán Token cho trận {match_id} vào đây (hoặc nhấn Enter để thử dùng Team Token mặc định): ").strip()
+    if prompt_token:
+        return prompt_token
+
+    team_token = os.getenv("PROCON_TEAM_TOKEN", DEFAULT_TEAM_TOKEN).strip()
+    return team_token
+
+
 def interactive_select_match() -> tuple:
     """Hỏi người dùng lựa chọn trận đấu nếu không truyền đối số command line."""
     print("📋 DANH SÁCH CÁC TRẬN ĐẤU CỦA ĐỘI MER:")
     print("  [1] m-32743 (Trận luyện tập với máy: 8x8, 4 ngày, 30 bước/ngày)")
     print("  [2] m-32742 (Trận kiểm tra bot trước trận)")
-    print("  [3] Nhập ID trận mới tùy ý...")
+    print("  [3] Nhập ID trận mới (ví dụ: m-32744)...")
     print("  [4] Chạy thử với Mock Server nội bộ (Offline Test)")
     
     choice = input("\n👉 Chọn (1-4 hoặc nhập trực tiếp Match ID, mặc định [1]): ").strip()
@@ -103,15 +137,9 @@ def interactive_select_match() -> tuple:
         # Nhập Match ID tùy ý
         match_id = choice.replace("3", "").strip() if choice.startswith("3") and len(choice) > 1 else choice
         if not match_id or match_id == "3":
-            match_id = input("👉 Nhập Match ID (ví dụ: m-32743): ").strip()
+            match_id = input("👉 Nhập Match ID (ví dụ: m-32744): ").strip()
         
-        # Tra cứu token
-        if match_id in KNOWN_MATCH_TOKENS:
-            token = KNOWN_MATCH_TOKENS[match_id]
-            print(f"[*] Tìm thấy token có sẵn cho trận {match_id}: {token[:12]}...")
-        else:
-            custom_token = input(f"👉 Nhập Token cho trận {match_id} (nhấn Enter để dùng Team Token mặc định): ").strip()
-            token = custom_token if custom_token else DEFAULT_TEAM_TOKEN
+        token = resolve_match_token(match_id)
         use_mock = False
 
     return match_id, token, use_mock
@@ -193,6 +221,19 @@ def play_match(
 
     except KeyboardInterrupt:
         print("\n[!] Người dùng đã hủy thực thi bot.")
+    except ProconAuthError:
+        print("\n" + "=" * 80)
+        print("❌ LỖI XÁC THỰC (HTTP 401 UNAUTHORIZED)")
+        print("=" * 80)
+        print(f"Nguyên nhân: Token bạn đang dùng không có quyền truy cập vào trận [{match_id}].")
+        print(f"Mỗi trận đấu trên web PROCON có một Token riêng biệt (thường bắt đầu bằng: {match_id}-a-...).")
+        print("\n👉 CÁCH KHẮC PHỤC:")
+        print(f"1. Vào trang web: https://procon.ptit.edu.vn")
+        print(f"2. Tìm trận [{match_id}] trong bảng 'Các trận của đội' hoặc 'Luyện tập với máy'.")
+        print(f"3. Copy giá trị trong cột 'Token riêng trận' (hoặc copy chuỗi sau '-token' trong lệnh mẫu).")
+        print(f"4. Chạy lại lệnh với tham số -t:")
+        print(f"   python run_match.py -m {match_id} -t <TOKEN_CỦA_TRẬN_{match_id}>")
+        print("=" * 80 + "\n")
     except Exception as e:
         print(f"\n❌ LỖI TRONG QUÁ TRÌNH KẾT NỐI HOẶC THI ĐẤU: {e}")
         print("💡 Gợi ý xử lý:")
@@ -213,13 +254,13 @@ def main():
         "-m", "--match",
         type=str,
         default=None,
-        help="ID trận đấu (ví dụ: m-32743, m-32742)",
+        help="ID trận đấu (ví dụ: m-32744, m-32743, m-32742)",
     )
     parser.add_argument(
         "-t", "--token",
         type=str,
         default=None,
-        help="Token của trận đấu hoặc của đội (nếu để trống sẽ tự lấy từ hồ sơ đội)",
+        help="Token của trận đấu (ví dụ: m-32744-a-...). Nếu để trống tool sẽ tự hỏi bạn dán token",
     )
     parser.add_argument(
         "-u", "--url",
@@ -250,13 +291,8 @@ def main():
     if args.match is None and not args.mock:
         match_id, token, use_mock = interactive_select_match()
     else:
-        match_id = args.match or ("mock_match_001" if args.mock else os.getenv("PROCON_MATCH_ID", "m-32743"))
-        if args.token:
-            token = args.token
-        elif match_id in KNOWN_MATCH_TOKENS:
-            token = KNOWN_MATCH_TOKENS[match_id]
-        else:
-            token = os.getenv("PROCON_TOKEN", DEFAULT_TEAM_TOKEN)
+        match_id = args.match or ("mock_match_001" if args.mock else "m-32743")
+        token = resolve_match_token(match_id, args.token)
         use_mock = args.mock
 
     play_match(
