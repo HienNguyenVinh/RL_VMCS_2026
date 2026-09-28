@@ -239,7 +239,15 @@ python -m unittest discover tests
   - [x] Triển khai `MockProconServer` phục vụ kiểm thử tự động
   - [x] Triển khai `MatchRunner` điều phối toàn bộ chu trình trận đấu
   - [x] Kiểm thử end-to-end thành công không lỗi
-- [ ] **PHASE 2 — Biểu diễn Hex Grid và bài toán MDP**
+- [x] **PHASE 2 — Biểu diễn Hex Grid và bài toán MDP**
+  - [x] Chọn và chuẩn hóa hệ tọa độ lục giác (even-r offset & Cube coordinates)
+  - [x] Triển khai đầy đủ 6 hướng láng giềng và kiểm tra ranh giới bản đồ
+  - [x] Nhận diện và xử lý các ô cản (`TerrainType.POND` không thể đi vào)
+  - [x] Thiết lập chi phí di chuyển và tiêu thụ nhiên liệu theo đúng luật PROCON 2026 (Đồng bằng, Núi, Ao, Đường theo cấp độ giao thông)
+  - [x] Phân loại thuộc tính tác nhân: vị trí, vai trò (Patrol vs Refuel), nhiên liệu, kiểm tra `valid_actions`
+  - [x] Triển khai simulator offline chuẩn Gym API (`reset()`, `step()`)
+  - [x] Kiểm thử 100 bước di chuyển offline không lỗi
+  - [x] Bộ unit test toàn diện cho map, movement, fuel, và collision
 - [ ] **PHASE 3 — Dynamic Programming Planner**
 - [ ] **PHASE 4 — Offline Multi-Agent RL cho phân công task**
 - [ ] **PHASE 5 — Tích hợp Hybrid MARL + DP**

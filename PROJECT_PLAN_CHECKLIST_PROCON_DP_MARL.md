@@ -249,32 +249,32 @@ Có simulator offline để phát triển DP và RL mà không phụ thuộc ser
 
 ### Hex Grid
 
-- [ ] Chọn coordinate system.
-- [ ] Implement 6 hướng.
-- [ ] Implement `get_neighbor(cell, direction)`.
-- [ ] Validate boundary.
-- [ ] Validate blocked cell.
-- [ ] Unit test tất cả 6 hướng.
+- [x] Chọn coordinate system.
+- [x] Implement 6 hướng.
+- [x] Implement `get_neighbor(cell, direction)`.
+- [x] Validate boundary.
+- [x] Validate blocked cell.
+- [x] Unit test tất cả 6 hướng.
 
 ### Map
 
-- [ ] Parse `width`.
-- [ ] Parse `height`.
-- [ ] Parse `cells`.
-- [ ] Convert `row, col -> index`.
-- [ ] Convert `index -> row, col`.
-- [ ] Parse terrain.
-- [ ] Parse roads nếu có.
-- [ ] Parse spots / udon.
-- [ ] Parse traffic.
+- [x] Parse `width`.
+- [x] Parse `height`.
+- [x] Parse `cells`.
+- [x] Convert `row, col -> index`.
+- [x] Convert `index -> row, col`.
+- [x] Parse terrain.
+- [x] Parse roads nếu có.
+- [x] Parse spots / udon.
+- [x] Parse traffic.
 
 ### Agent
 
-- [ ] Position.
-- [ ] Kind.
-- [ ] Fuel.
-- [ ] Valid actions.
-- [ ] Movement cost.
+- [x] Position.
+- [x] Kind.
+- [x] Fuel.
+- [x] Valid actions.
+- [x] Movement cost.
 
 ### Simulator API
 
@@ -286,9 +286,9 @@ next_state, reward, done, info = env.step(actions)
 
 ### Definition of Done
 
-- [ ] Có thể chạy 100 bước offline không lỗi.
-- [ ] Transition giống logic challenge.
-- [ ] Có unit test map / movement / fuel.
+- [x] Có thể chạy 100 bước offline không lỗi.
+- [x] Transition giống logic challenge.
+- [x] Có unit test map / movement / fuel.
 
 ---
 
