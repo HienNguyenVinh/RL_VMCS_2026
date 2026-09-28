@@ -181,6 +181,14 @@ python main.py --mode marl
 python experiments/run_marl.py
 ```
 
+### Chạy Benchmark Baseline Path Planning (BFS vs Dijkstra - Phase 3)
+
+```bash
+python main.py --mode baseline
+# hoặc:
+python experiments/run_baseline_comparison.py
+```
+
 ### Chạy so sánh hiệu quả Hybrid MARL+DP vs Baseline
 
 ```bash
@@ -239,7 +247,7 @@ python -m unittest discover tests
   - [x] Triển khai `MockProconServer` phục vụ kiểm thử tự động
   - [x] Triển khai `MatchRunner` điều phối toàn bộ chu trình trận đấu
   - [x] Kiểm thử end-to-end thành công không lỗi
-- [x] **PHASE 2 — Biểu diễn Hex Grid và bài toán MDP**
+- [x] **PHASE 2 — Xây Offline Environment & Hex Grid**
   - [x] Chọn và chuẩn hóa hệ tọa độ lục giác (even-r offset & Cube coordinates)
   - [x] Triển khai đầy đủ 6 hướng láng giềng và kiểm tra ranh giới bản đồ
   - [x] Nhận diện và xử lý các ô cản (`TerrainType.POND` không thể đi vào)
@@ -248,9 +256,17 @@ python -m unittest discover tests
   - [x] Triển khai simulator offline chuẩn Gym API (`reset()`, `step()`)
   - [x] Kiểm thử 100 bước di chuyển offline không lỗi
   - [x] Bộ unit test toàn diện cho map, movement, fuel, và collision
-- [ ] **PHASE 3 — Dynamic Programming Planner**
-- [ ] **PHASE 4 — Offline Multi-Agent RL cho phân công task**
-- [ ] **PHASE 5 — Tích hợp Hybrid MARL + DP**
-- [ ] **PHASE 6 — Kết nối bot hybrid với server PROCON**
-- [ ] **PHASE 7 — Thí nghiệm, ablation study và baseline**
-- [ ] **PHASE 8 — Đóng gói, viết báo cáo và chuẩn bị demo**
+- [x] **PHASE 3 — Baseline Path Planning (BFS & Dijkstra)**
+  - [x] Triển khai BFS tìm đường tối thiểu số bước nhảy (minimum hops)
+  - [x] Triển khai Dijkstra tìm đường tối ưu chi phí di chuyển (minimum movement cost)
+  - [x] Tích hợp chi phí địa hình và mức độ giao thông (Đồng bằng, Núi, Ao, Đường)
+  - [x] Xử lý tránh ô cản (Ao - Pond) và nhận diện mục tiêu không thể tiếp cận (unreachable)
+  - [x] Ràng buộc hạn mức nhiên liệu cho xe tuần tra (fuel constraints)
+  - [x] Thu thập và đo lường đầy đủ 4 chỉ số: Route length, Movement cost, Runtime, Fuel consumption
+  - [x] Kiểm thử tự tính bằng tay (hand-calculated) xác thực tính tối ưu toán học
+  - [x] Bộ unit test chuyên biệt `test_baseline_planners.py` đạt 100% Pass
+- [ ] **PHASE 4 — Dynamic Programming (Gridworld / MDP)**
+- [ ] **PHASE 5 — Multi-Agent RL cho phân công task (MARL / IQL)**
+- [ ] **PHASE 6 — Tích hợp Hybrid MARL + DP**
+- [ ] **PHASE 7 — Kết nối bot hybrid với server PROCON**
+- [ ] **PHASE 8 — Thí nghiệm, ablation study, baseline và báo cáo**

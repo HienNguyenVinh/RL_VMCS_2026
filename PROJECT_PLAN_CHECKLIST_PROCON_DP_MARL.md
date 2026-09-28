@@ -300,25 +300,25 @@ Tạo baseline trước khi làm DP.
 
 ### Checklist
 
-- [ ] BFS.
-- [ ] Dijkstra.
-- [ ] Cost function cho terrain.
-- [ ] Test shortest path.
-- [ ] Test unreachable target.
-- [ ] Test blocked cell.
-- [ ] Test fuel constraint đơn giản.
+- [x] BFS.
+- [x] Dijkstra.
+- [x] Cost function cho terrain.
+- [x] Test shortest path.
+- [x] Test unreachable target.
+- [x] Test blocked cell.
+- [x] Test fuel constraint đơn giản.
 
 ### Metrics
 
-- [ ] Route length.
-- [ ] Movement cost.
-- [ ] Runtime.
-- [ ] Fuel consumption.
+- [x] Route length.
+- [x] Movement cost.
+- [x] Runtime.
+- [x] Fuel consumption.
 
 ### Definition of Done
 
-- [ ] Dijkstra tìm đúng minimum-cost path trên map nhỏ.
-- [ ] Có test case tự tính bằng tay.
+- [x] Dijkstra tìm đúng minimum-cost path trên map nhỏ.
+- [x] Có test case tự tính bằng tay.
 
 ---
 

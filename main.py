@@ -74,7 +74,7 @@ def main():
     parser = argparse.ArgumentParser(description="PTIT PROCON 2026 DP-MARL Bot")
     parser.add_argument(
         "--mode",
-        choices=["demo", "dp", "marl", "hybrid", "server", "smoke_test"],
+        choices=["demo", "baseline", "dp", "marl", "hybrid", "server", "smoke_test"],
         default="demo",
         help="Execution mode (default: demo)",
     )
@@ -125,6 +125,9 @@ def main():
     try:
         if args.mode == "demo":
             run_demo(config)
+        elif args.mode == "baseline":
+            from experiments.run_baseline_comparison import run_baseline_benchmark
+            run_baseline_benchmark()
         elif args.mode == "dp":
             from experiments.run_dp import run_dp_experiment
             run_dp_experiment()
