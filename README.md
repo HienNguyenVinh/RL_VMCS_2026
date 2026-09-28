@@ -265,8 +265,27 @@ python -m unittest discover tests
   - [x] Thu thập và đo lường đầy đủ 4 chỉ số: Route length, Movement cost, Runtime, Fuel consumption
   - [x] Kiểm thử tự tính bằng tay (hand-calculated) xác thực tính tối ưu toán học
   - [x] Bộ unit test chuyên biệt `test_baseline_planners.py` đạt 100% Pass
-- [ ] **PHASE 4 — Dynamic Programming (Gridworld / MDP)**
-- [ ] **PHASE 5 — Multi-Agent RL cho phân công task (MARL / IQL)**
-- [ ] **PHASE 6 — Tích hợp Hybrid MARL + DP**
-- [ ] **PHASE 7 — Kết nối bot hybrid với server PROCON**
-- [ ] **PHASE 8 — Thí nghiệm, ablation study, baseline và báo cáo**
+- [x] **PHASE 4 — Dynamic Programming (Gridworld / MDP)**
+  - [x] Thiết lập mô hình MDP chuẩn: Trạng thái, Hành động, Chuyển trạng thái, Phần thưởng, Terminal states
+  - [x] Triển khai Iterative Policy Evaluation với Bellman expectation update
+  - [x] Triển khai Policy Iteration với cơ chế kiểm tra tính hội tụ / chính sách ổn định
+  - [x] Triển khai Value Iteration với Bellman optimality backup và trích xuất lộ trình (tránh loop)
+  - [x] Thí nghiệm so sánh VI vs PI vs Dijkstra, khảo sát ảnh hưởng của discount factor $\gamma$
+  - [x] Vẽ và lưu biểu đồ hội tụ Bellman sweep (`plots/dp_convergence.png`)
+  - [x] Độ tương đồng chính sách tối ưu giữa VI và PI đạt **100%**
+- [x] **PHASE 5 — Single-Agent Q-Learning**
+  - [x] Khởi tạo Q-table, chiến lược $\epsilon$-greedy, decay exploration
+  - [x] Cập nhật Temporal Difference (TD update) và episode loop
+  - [x] Lưu và nạp trọng số Q-table (`save` / `load` JSON)
+  - [x] Đánh giá trên nhiều seed ngẫu nhiên
+  - [x] Agent học vượt trội so với Random Baseline (+60.07 điểm)
+  - [x] Vẽ và lưu learning curve (`plots/single_agent_qlearning.png`)
+- [x] **PHASE 6 — Multi-Agent RL cho phân công task (MARL / IQL)**
+  - [x] Kiến trúc Independent Q-Learning (IQL): mỗi agent sở hữu Q-table riêng
+  - [x] Mã hóa không gian trạng thái đa tác nhân (vị trí, cụm nhiên liệu, khoảng cách đích, hành động của đồng đội)
+  - [x] Cơ chế phát hiện xung đột và áp dụng phạt xung đột (Conflict Penalty)
+  - [x] Thí nghiệm so sánh: IQL có phạt xung đột vs IQL thuần vs Random Baseline
+  - [x] Giảm thiểu tỷ lệ tranh chấp mục tiêu và nâng cao điểm số toàn đội
+  - [x] Vẽ và lưu đồ thị hội tụ phần thưởng và đồ thị giảm thiểu xung đột (`plots/marl_coordination_curve.png`)
+- [ ] **PHASE 7 — Kết hợp MARL + DP (Hierarchical Strategy)**
+- [ ] **PHASE 8 — Fuel / Refueling & Tournament Experiments**

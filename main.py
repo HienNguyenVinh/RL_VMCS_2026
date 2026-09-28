@@ -74,7 +74,7 @@ def main():
     parser = argparse.ArgumentParser(description="PTIT PROCON 2026 DP-MARL Bot")
     parser.add_argument(
         "--mode",
-        choices=["demo", "baseline", "dp", "marl", "hybrid", "server", "smoke_test"],
+        choices=["demo", "baseline", "dp", "single_rl", "marl", "hybrid", "server", "smoke_test"],
         default="demo",
         help="Execution mode (default: demo)",
     )
@@ -131,6 +131,9 @@ def main():
         elif args.mode == "dp":
             from experiments.run_dp import run_dp_experiment
             run_dp_experiment()
+        elif args.mode == "single_rl":
+            from experiments.run_single_agent_rl import train_single_agent
+            train_single_agent()
         elif args.mode == "marl":
             from experiments.run_marl import run_marl_experiment
             run_marl_experiment()

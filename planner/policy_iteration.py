@@ -22,6 +22,7 @@ class PolicyIteration:
         self.gamma = gamma
         self.evaluator = IterativePolicyEvaluation(grid, gamma, theta, max_eval_iters)
         self.max_policy_iters = max_policy_iters
+        self.sweeps_per_policy_iter: List[int] = []
 
     def plan(
         self,
@@ -39,6 +40,7 @@ class PolicyIteration:
         """
         targets = set(target_indices)
         all_actions = Direction.all_movements()
+        self.sweeps_per_policy_iter = []
 
         # Initialize uniform random policy
         policy: Dict[int, Dict[Direction, float]] = {}
@@ -58,11 +60,12 @@ class PolicyIteration:
                 policy, target_indices, step_cost, target_reward
             )
             total_eval_sweeps += eval_sweeps
+            self.sweeps_per_policy_iter.append(eval_sweeps)
 
             # 2. Policy Improvement
             policy_stable = True
             for s in range(self.grid.num_cells):
-                if s in targets:
+                if s in targets or not self.grid.is_passable(s):
                     deterministic_policy[s] = Direction.STAY
                     continue
 
@@ -72,8 +75,8 @@ class PolicyIteration:
 
                 for a in all_actions:
                     nxt_s = self.grid.get_neighbor_index(s, a)
-                    if nxt_s is None:
-                        q_val = (step_cost - 5.0) + self.gamma * V[s]
+                    if nxt_s is None or not self.grid.is_passable(nxt_s):
+                        q_val = (step_cost - 10.0) + self.gamma * V[s]
                     elif nxt_s in targets:
                         q_val = target_reward
                     else:
@@ -95,3 +98,39 @@ class PolicyIteration:
                 break
 
         return deterministic_policy, V, policy_iters, total_eval_sweeps
+
+    def extract_route(
+        self,
+        start: int,
+        target_indices: List[int],
+        policy: Dict[int, Direction],
+        max_steps: int = 100,
+    ) -> Tuple[List[int], List[Direction], bool]:
+        """Extract path and action sequence from policy with loop detection."""
+        targets = set(target_indices)
+        curr = start
+        path = [curr]
+        actions: List[Direction] = []
+        visited = {curr}
+
+        for _ in range(max_steps):
+            if curr in targets:
+                return path, actions, True
+
+            act = policy.get(curr, Direction.STAY)
+            if act == Direction.STAY:
+                break
+
+            nxt = self.grid.get_neighbor_index(curr, act)
+            if nxt is None or not self.grid.is_passable(nxt):
+                break
+
+            if nxt in visited and nxt not in targets:
+                break
+
+            visited.add(nxt)
+            actions.append(act)
+            path.append(nxt)
+            curr = nxt
+
+        return path, actions, (curr in targets)

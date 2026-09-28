@@ -332,12 +332,12 @@ Hoàn thành phần Gridworld / MDP.
 
 ### 4.1 MDP formulation
 
-- [ ] Xác định state `S`.
-- [ ] Xác định action `A`.
-- [ ] Xác định transition `P`.
-- [ ] Xác định reward `R`.
-- [ ] Chọn `gamma`.
-- [ ] Xác định terminal states.
+- [x] Xác định state `S`.
+- [x] Xác định action `A`.
+- [x] Xác định transition `P`.
+- [x] Xác định reward `R`.
+- [x] Chọn `gamma`.
+- [x] Xác định terminal states.
 
 Ví dụ phiên bản đầu:
 
@@ -363,31 +363,31 @@ Terminal:
 
 ### 4.2 Iterative Policy Evaluation
 
-- [ ] Initialize `V(s)`.
-- [ ] Implement Bellman expectation update.
-- [ ] Implement convergence threshold `theta`.
-- [ ] Log Bellman sweeps.
-- [ ] Test trên Gridworld nhỏ.
+- [x] Initialize `V(s)`.
+- [x] Implement Bellman expectation update.
+- [x] Implement convergence threshold `theta`.
+- [x] Log Bellman sweeps.
+- [x] Test trên Gridworld nhỏ.
 
 ---
 
 ### 4.3 Policy Iteration
 
-- [ ] Random initial policy.
-- [ ] Policy Evaluation.
-- [ ] Policy Improvement.
-- [ ] Detect stable policy.
-- [ ] Count policy improvement steps.
+- [x] Random initial policy.
+- [x] Policy Evaluation.
+- [x] Policy Improvement.
+- [x] Detect stable policy.
+- [x] Count policy improvement steps.
 
 ---
 
 ### 4.4 Value Iteration
 
-- [ ] Implement Bellman optimality update.
-- [ ] Implement convergence threshold.
-- [ ] Extract optimal policy.
-- [ ] Extract route từ policy.
-- [ ] Detect loop / invalid policy.
+- [x] Implement Bellman optimality update.
+- [x] Implement convergence threshold.
+- [x] Extract optimal policy.
+- [x] Extract route từ policy.
+- [x] Detect loop / invalid policy.
 
 ---
 
@@ -395,32 +395,32 @@ Terminal:
 
 So sánh:
 
-- [ ] Policy Iteration.
-- [ ] Value Iteration.
-- [ ] Dijkstra.
+- [x] Policy Iteration.
+- [x] Value Iteration.
+- [x] Dijkstra.
 
 Thay đổi:
 
-- [ ] `gamma`.
-- [ ] Map size.
-- [ ] Terrain cost.
-- [ ] Stochastic transition nếu có extension.
-- [ ] Different terminal rewards.
+- [x] `gamma`.
+- [x] Map size.
+- [x] Terrain cost.
+- [x] Stochastic transition nếu có extension.
+- [x] Different terminal rewards.
 
 Metrics:
 
-- [ ] Bellman sweeps.
-- [ ] Policy improvement steps.
-- [ ] Runtime.
-- [ ] Final route cost.
-- [ ] Convergence delta.
+- [x] Bellman sweeps.
+- [x] Policy improvement steps.
+- [x] Runtime.
+- [x] Final route cost.
+- [x] Convergence delta.
 
 ### Definition of Done
 
-- [ ] VI và PI trả policy hợp lý.
-- [ ] VI / PI đồng ý về optimal policy trên test nhỏ.
-- [ ] Có convergence plot.
-- [ ] Có bảng so sánh VI vs PI vs Dijkstra.
+- [x] VI và PI trả policy hợp lý.
+- [x] VI / PI đồng ý về optimal policy trên test nhỏ.
+- [x] Có convergence plot.
+- [x] Có bảng so sánh VI vs PI vs Dijkstra.
 
 ---
 
@@ -432,17 +432,17 @@ Hiểu và kiểm tra Q-Learning trước khi chuyển sang MARL.
 
 ### Checklist
 
-- [ ] Q-table.
-- [ ] ε-greedy.
-- [ ] Learning rate `alpha`.
-- [ ] Discount `gamma`.
-- [ ] ε decay.
-- [ ] Episode loop.
-- [ ] TD update.
-- [ ] Save Q-table.
-- [ ] Load Q-table.
-- [ ] Learning curve.
-- [ ] Multiple seeds.
+- [x] Q-table.
+- [x] ε-greedy.
+- [x] Learning rate `alpha`.
+- [x] Discount `gamma`.
+- [x] ε decay.
+- [x] Episode loop.
+- [x] TD update.
+- [x] Save Q-table.
+- [x] Load Q-table.
+- [x] Learning curve.
+- [x] Multiple seeds.
 
 ### Test task
 
@@ -456,16 +456,16 @@ chọn target tốt nhất
 
 ### Metrics
 
-- [ ] Episodic return.
-- [ ] Success rate.
-- [ ] Steps to goal.
-- [ ] Policy stability.
+- [x] Episodic return.
+- [x] Success rate.
+- [x] Steps to goal.
+- [x] Policy stability.
 
 ### Definition of Done
 
-- [ ] Agent học tốt hơn random.
-- [ ] Reward trung bình tăng theo training.
-- [ ] Kết quả tương đối ổn định qua nhiều seed.
+- [x] Agent học tốt hơn random.
+- [x] Reward trung bình tăng theo training.
+- [x] Kết quả tương đối ổn định qua nhiều seed.
 
 ---
 
@@ -510,15 +510,15 @@ Idle
 
 ### Checklist Independent Q-Learning
 
-- [ ] Mỗi agent có Q-table riêng.
-- [ ] Mỗi agent chọn action bằng ε-greedy.
-- [ ] Shared environment.
-- [ ] Shared reward.
-- [ ] Individual reward option.
-- [ ] Conflict detection.
-- [ ] Conflict penalty.
-- [ ] Episode reset.
-- [ ] Multi-seed training.
+- [x] Mỗi agent có Q-table riêng.
+- [x] Mỗi agent chọn action bằng ε-greedy.
+- [x] Shared environment.
+- [x] Shared reward.
+- [x] Individual reward option.
+- [x] Conflict detection.
+- [x] Conflict penalty.
+- [x] Episode reset.
+- [x] Multi-seed training.
 
 ### Reward
 
@@ -536,25 +536,25 @@ Ví dụ:
 
 ### Experiment quan trọng
 
-- [ ] Shared reward vs individual reward.
-- [ ] Có conflict penalty vs không có.
-- [ ] ε cao vs thấp.
-- [ ] 2 agents vs nhiều agent hơn.
+- [x] Shared reward vs individual reward.
+- [x] Có conflict penalty vs không có.
+- [x] ε cao vs thấp.
+- [x] 2 agents vs nhiều agent hơn.
 
 ### Metrics
 
-- [ ] Team return.
-- [ ] Conflict rate.
-- [ ] Duplicate assignment rate.
-- [ ] Tasks completed.
-- [ ] Resource efficiency.
-- [ ] Coordination success rate.
+- [x] Team return.
+- [x] Conflict rate.
+- [x] Duplicate assignment rate.
+- [x] Tasks completed.
+- [x] Resource efficiency.
+- [x] Coordination success rate.
 
 ### Definition of Done
 
-- [ ] Hai agent học tránh chọn cùng task tốt hơn random.
-- [ ] Conflict rate giảm sau training.
-- [ ] Có learning curve.
+- [x] Hai agent học tránh chọn cùng task tốt hơn random.
+- [x] Conflict rate giảm sau training.
+- [x] Có learning curve.
 
 ---
 

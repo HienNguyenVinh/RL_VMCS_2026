@@ -1,5 +1,5 @@
 """Value Iteration for Hex Grid MDP."""
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 import numpy as np
 
 from client.protocol import Direction
@@ -20,6 +20,7 @@ class ValueIteration:
         self.gamma = gamma
         self.theta = theta
         self.max_iterations = max_iterations
+        self.convergence_deltas: List[float] = []
 
     def plan(
         self,
@@ -31,12 +32,13 @@ class ValueIteration:
         
         Returns:
             optimal_policy: Dict mapping cell index -> optimal Direction
-            V: State-value array
+            V: State-value array of shape (num_cells,)
             iterations: Number of Bellman optimality sweeps
         """
         V = np.zeros(self.grid.num_cells, dtype=np.float64)
         targets = set(target_indices)
         all_actions = Direction.all_movements()
+        self.convergence_deltas = []
 
         iterations = 0
         for iteration in range(self.max_iterations):
@@ -48,11 +50,15 @@ class ValueIteration:
                     new_V[s] = target_reward
                     continue
 
+                if not self.grid.is_passable(s):
+                    new_V[s] = -100.0  # Impassable cell penalty
+                    continue
+
                 best_val = -float("inf")
                 for a in all_actions:
                     nxt_s = self.grid.get_neighbor_index(s, a)
-                    if nxt_s is None:
-                        val = (step_cost - 5.0) + self.gamma * V[s]
+                    if nxt_s is None or not self.grid.is_passable(nxt_s):
+                        val = (step_cost - 10.0) + self.gamma * V[s]
                     elif nxt_s in targets:
                         val = target_reward
                     else:
@@ -67,6 +73,8 @@ class ValueIteration:
 
             V = new_V
             iterations = iteration + 1
+            self.convergence_deltas.append(float(delta))
+
             if delta < self.theta:
                 break
 
@@ -77,12 +85,16 @@ class ValueIteration:
                 policy[s] = Direction.STAY
                 continue
 
+            if not self.grid.is_passable(s):
+                policy[s] = Direction.STAY
+                continue
+
             best_a = Direction.STAY
             best_q = -float("inf")
             for a in all_actions:
                 nxt_s = self.grid.get_neighbor_index(s, a)
-                if nxt_s is None:
-                    q = (step_cost - 5.0) + self.gamma * V[s]
+                if nxt_s is None or not self.grid.is_passable(nxt_s):
+                    q = (step_cost - 10.0) + self.gamma * V[s]
                 elif nxt_s in targets:
                     q = target_reward
                 else:
@@ -95,3 +107,46 @@ class ValueIteration:
             policy[s] = best_a
 
         return policy, V, iterations
+
+    def extract_route(
+        self,
+        start: int,
+        target_indices: List[int],
+        policy: Dict[int, Direction],
+        max_steps: int = 100,
+    ) -> Tuple[List[int], List[Direction], bool]:
+        """Extract path and action sequence from policy, with loop detection.
+        
+        Returns:
+            path: List of visited cell indices
+            actions: List of Direction taken
+            reached: True if reached any target, False if looped or timed out
+        """
+        targets = set(target_indices)
+        curr = start
+        path = [curr]
+        actions: List[Direction] = []
+        visited = {curr}
+
+        for _ in range(max_steps):
+            if curr in targets:
+                return path, actions, True
+
+            act = policy.get(curr, Direction.STAY)
+            if act == Direction.STAY:
+                break
+
+            nxt = self.grid.get_neighbor_index(curr, act)
+            if nxt is None or not self.grid.is_passable(nxt):
+                break
+
+            if nxt in visited and nxt not in targets:
+                # Cycle / loop detected!
+                break
+
+            visited.add(nxt)
+            actions.append(act)
+            path.append(nxt)
+            curr = nxt
+
+        return path, actions, (curr in targets)

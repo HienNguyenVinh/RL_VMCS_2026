@@ -20,6 +20,7 @@ class IterativePolicyEvaluation:
         self.gamma = gamma
         self.theta = theta
         self.max_iterations = max_iterations
+        self.convergence_deltas: List[float] = []
 
     def evaluate(
         self,
@@ -36,6 +37,7 @@ class IterativePolicyEvaluation:
         """
         V = np.zeros(self.grid.num_cells, dtype=np.float64)
         targets = set(target_indices)
+        self.convergence_deltas = []
 
         iterations = 0
         for iteration in range(self.max_iterations):
@@ -47,6 +49,10 @@ class IterativePolicyEvaluation:
                     new_V[s] = target_reward
                     continue
 
+                if not self.grid.is_passable(s):
+                    new_V[s] = -100.0
+                    continue
+
                 action_probs = policy.get(s, {})
                 if not action_probs:
                     continue
@@ -54,9 +60,8 @@ class IterativePolicyEvaluation:
                 v_s = 0.0
                 for action, prob in action_probs.items():
                     nxt_s = self.grid.get_neighbor_index(s, action)
-                    if nxt_s is None:
-                        # Out of bounds or invalid move
-                        reward = step_cost - 5.0
+                    if nxt_s is None or not self.grid.is_passable(nxt_s):
+                        reward = step_cost - 10.0
                         expected_nxt_val = V[s]
                     elif nxt_s in targets:
                         reward = target_reward
@@ -73,6 +78,8 @@ class IterativePolicyEvaluation:
 
             V = new_V
             iterations = iteration + 1
+            self.convergence_deltas.append(float(delta))
+
             if delta < self.theta:
                 break
 
