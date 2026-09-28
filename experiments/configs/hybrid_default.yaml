@@ -1,0 +1,18 @@
+# Configuration for Hybrid MARL + DP Benchmark Experiments
+experiment_name: "hybrid_benchmark"
+num_runs: 10
+seeds: [42, 101, 2024, 777, 999]
+
+map:
+  width: 15
+  height: 15
+  day_steps: 10
+  num_days: 3
+  num_patrol: 2
+  num_refuel: 1
+  num_spots: 5
+
+strategies_to_compare:
+  - "greedy"
+  - "dp_only"
+  - "hybrid"

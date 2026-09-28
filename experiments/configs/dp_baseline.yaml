@@ -1,0 +1,16 @@
+# Configuration for DP Experiments (Value Iteration vs Policy Iteration)
+experiment_name: "dp_comparison"
+grid:
+  width: 15
+  height: 15
+  terrain_distribution: "mixed"
+
+dp:
+  gamma_values: [0.8, 0.9, 0.95, 0.99]
+  thetas: [1e-3, 1e-4, 1e-5]
+  max_iterations: 1000
+
+evaluation:
+  num_targets: 3
+  step_cost: -1.0
+  target_reward: 50.0

@@ -1,0 +1,41 @@
+[project]
+name = "procon-dp-marl"
+version = "0.1.0"
+description = "Hybrid Dynamic Programming & Multi-Agent RL for PTIT PROCON 2026"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31.0",
+    "websockets>=12.0",
+    "python-dotenv>=1.0.1",
+    "pyyaml>=6.0.1",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "matplotlib>=3.8.0",
+    "tqdm>=4.66.0",
+    "rich>=13.7.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501", # line too long (handled by formatter)
+]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

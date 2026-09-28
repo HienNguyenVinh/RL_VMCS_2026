@@ -1,0 +1,43 @@
+# Default Configuration for DP-MARL HexUdon (PTIT PROCON 2026)
+
+server:
+  base_url: "https://procon.ptit.edu.vn"
+  poll_interval: 1.0       # Seconds between HTTP polling requests
+  request_timeout: 5.0     # HTTP request timeout in seconds
+  ws_enabled: false        # WebSocket mode toggle
+
+team:
+  name: "DP-MARL Squad"
+  patrol_agents: 2         # Default number of patrol agents
+  refuel_agents: 1         # Default number of refuel agents
+
+hex_grid:
+  directions_count: 6      # 0: Up-Left, 1: Up-Right, 2: Right, 3: Down-Right, 4: Down-Left, 5: Left
+  default_move_cost: 1.0
+  traffic_penalty_multiplier: 1.5
+
+dp:
+  gamma: 0.95              # Discount factor
+  theta: 0.0001            # Convergence threshold for Value / Policy Iteration
+  max_iterations: 1000     # Maximum Bellman sweeps per planning phase
+
+marl:
+  algorithm: "IQL"         # Independent Q-Learning
+  learning_rate: 0.1       # Alpha
+  discount_factor: 0.90    # Gamma for macro task allocation
+  epsilon_initial: 1.0     # Exploration rate
+  epsilon_min: 0.05
+  epsilon_decay: 0.995
+  shared_reward_weight: 0.7
+  individual_reward_weight: 0.3
+  conflict_penalty: -10.0
+
+strategy:
+  active_mode: "hybrid"    # Options: "hybrid", "dp_only", "marl_only", "greedy"
+  fallback: "greedy"       # Fallback if planning exceeds time limit
+  decision_timeout_ms: 800 # Time budget per step in ms
+
+logging:
+  level: "INFO"
+  save_plots: true
+  plot_dir: "plots"
