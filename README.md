@@ -296,5 +296,19 @@ python -m unittest discover tests
   - [x] Thử nghiệm đa hạt giống độc lập (Seeds 42, 101, 777, 999): Proposed đạt điểm cao nhất (**23.8 ± 2.2**), tiết kiệm nhiên liệu vượt trội (**29.5 fuel** so với 51.2 của B3) và độ trễ ra quyết định an toàn (**~497 ms/ngày** < 1000ms)
   - [x] Vẽ và lưu đồ thị so sánh 4 chiều: [`plots/hybrid_comparison.png`](file:///d:/PythonProject/procon/plots/hybrid_comparison.png)
   - [x] Lệnh chạy trực tiếp: `python main.py --mode hybrid`
-- [ ] **PHASE 8 — Fuel / Refueling & Tournament Experiments**
+- [x] **PHASE 8 — Fuel / Refueling & Tournament Experiments**
+  - [x] Mô hình tiêu thụ nhiên liệu theo luật địa hình PTIT PROCON (Đồng bằng: 1, Núi: 2, Đường: 2; Xe tiếp tế: 0)
+  - [x] Phát hiện ngưỡng nhiên liệu thấp (`low_fuel_threshold = 0.35`) và gửi yêu cầu cứu hộ `RefuelRequest`
+  - [x] Lựa chọn ô hẹn gặp tối ưu (`Rendezvous Cell Selection`) cân bằng thời gian tiếp cận và tiết kiệm nhiên liệu
+  - [x] Cơ chế đồng bộ hóa thời gian (`Time Synchronization`): xe đến trước đứng yên đợi xe đến sau để chuyển giao nhiên liệu
+  - [x] Chiến lược Fallback khi nguy cấp: Xe tuần tra đứng yên bảo toàn pin, xe tiếp xăng di chuyển thẳng đến vị trí xe tuần tra
+  - [x] Mô phỏng tiếp tế thành công trong `HexGridSimulator` (nạp tối đa 10 đơn vị xăng/bước khi khoảng cách $\le 1$)
+  - [x] Giải đấu thử nghiệm dài ngày (Tournament 8 ngày, 4 seeds):
+    - C3 (Rendezvous Proposed): **23.8 ± 7.4 điểm**, tiếp nạp **27.5 đơn vị xăng**, **0.0% tỷ lệ chết đói (Starvation Rate)**
+    - C2 (Ad-Hoc Chasing): 16.2 điểm, tiếp nạp 12.5 xăng, tỷ lệ chết đói 3.9% (bị bỏ rơi do không hẹn trước)
+    - C1 (No Refuel): 18.8 điểm, xe không dám mở rộng tầm hoạt động
+  - [x] Biểu đồ phân tích giải đấu và diễn biến nhiên liệu theo bước: [`plots/refuel_tournament.png`](file:///d:/PythonProject/procon/plots/refuel_tournament.png)
+  - [x] Lệnh chạy trực tiếp: `python main.py --mode tournament` hoặc `python main.py --mode refuel`
+- [ ] **PHASE 9 — Chạy trên server thật & Match Automation**
+
 

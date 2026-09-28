@@ -1,0 +1,20 @@
+{
+  "run_id": "EXP-004_No_Refueling",
+  "timestamp": "2026-09-28T21:48:11.938011",
+  "phase": 8,
+  "config": "C1: No Refueling",
+  "seeds": [
+    42,
+    101,
+    777,
+    999
+  ],
+  "num_days": 8,
+  "score_mean": 18.75,
+  "score_std": 6.49519052838329,
+  "transferred_mean": 21.75,
+  "transferred_std": 18.659782956937093,
+  "starvation_mean": 0.0,
+  "starvation_std": 0.0,
+  "stranded_mean": 0.0
+}

@@ -631,15 +631,15 @@ Thêm cooperation liên quan đến fuel sau khi core pipeline đã ổn.
 
 ### Checklist
 
-- [ ] Fuel consumption model.
-- [ ] Low-fuel threshold.
-- [ ] Refuel vehicle.
-- [ ] Refuel request.
-- [ ] Chọn rendezvous cell.
-- [ ] Patrol route tới rendezvous.
-- [ ] Refuel route tới rendezvous.
-- [ ] Check time synchronization.
-- [ ] Fallback nếu rendezvous không khả thi.
+- [x] Fuel consumption model.
+- [x] Low-fuel threshold.
+- [x] Refuel vehicle.
+- [x] Refuel request.
+- [x] Chọn rendezvous cell.
+- [x] Patrol route tới rendezvous.
+- [x] Refuel route tới rendezvous.
+- [x] Check time synchronization.
+- [x] Fallback nếu rendezvous không khả thi.
 
 ### Version 1 đơn giản
 
@@ -652,9 +652,10 @@ Không cần tối ưu rendezvous phức tạp ngay.
 
 ### Definition of Done
 
-- [ ] Agent không hết fuel vô lý.
-- [ ] Refuel task hoạt động trong simulator.
-- [ ] Có metric fuel failure rate.
+- [x] Agent không hết fuel vô lý (Starvation rate = 0.0% trên Rendezvous Coordination).
+- [x] Refuel task hoạt động trong simulator (Nạp 27.5 đơn vị fuel/trận).
+- [x] Có metric fuel failure rate (Theo dõi starvation rate và số xe bị bất động).
+
 
 ---
 

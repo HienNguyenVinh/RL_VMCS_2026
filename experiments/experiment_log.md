@@ -4,7 +4,7 @@ Bảng ghi chép và theo dõi toàn bộ các lần chạy thí nghiệm, đán
 
 ## 1. Bảng tóm tắt thí nghiệm
 
-| Run ID | Ngày thực hiện | Thuật toán / Chiến lược | Bản đồ & Seed | Tham số chính (`gamma`, `alpha`, `eps`, ...) | Tổng Điểm (Score) | Nhiên liệu tiêu thụ | Số xung đột (Conflicts) | Thời gian tính / bước (hoặc ngày) | Ghi chú & Plot |
+| Run ID | Ngày thực hiện | Thuật toán / Chiến lược | Bản đồ & Seed | Tham số chính (`gamma`, `alpha`, `eps`, ...) | Tổng Điểm (Score) | Nhiên liệu tiêu thụ / nạp | Số xung đột (Conflicts) | Thời gian tính / ngày | Ghi chú & Plot |
 |---|---|---|---|---|---|---|---|---|---|
 | `EXP-000` | 2026-09-28 | Baseline Greedy Sanity Check | 15x15 (Seed 42) | Greedy 1-step | 10.0 | 6.0 | 48.8 | ~0.9ms | Test pipeline Phase 0 |
 | `EXP-001` | 2026-09-28 | Dynamic Programming (VI vs PI) | 15x15 (225 ô) | $\gamma=0.95, \theta=1e-4$ | Optimal | - | 0 | VI: 59.6ms / PI: 1116ms | 100% Policy Agreement (`plots/dp_convergence.png`) |
@@ -13,7 +13,10 @@ Bảng ghi chép và theo dõi toàn bộ các lần chạy thí nghiệm, đán
 | `EXP-003b` | 2026-09-28 | B1: Greedy + Dijkstra | 12x12 (4 seeds) | Greedy task + Dijkstra path | 10.0 ± 0.0 | 6.8 ± 3.3 | 48.8 ± 30.2 | 0.92 ms/day | Baseline B1: Xung đột cao do cùng nhắm 1 điểm |
 | `EXP-003c` | 2026-09-28 | B2: Greedy + DP | 12x12 (4 seeds) | Greedy task + Value Iteration | 10.0 ± 0.0 | 6.8 ± 3.3 | 48.8 ± 30.2 | 70.55 ms/day | Baseline B2: Đường đi tối ưu nhưng thiếu phân công |
 | `EXP-003d` | 2026-09-28 | B3: IQL + Dijkstra | 12x12 (4 seeds) | MARL allocation + Dijkstra | 21.2 ± 4.1 | 51.2 ± 13.2 | 7.8 ± 6.3 | 7.55 ms/day | Baseline B3: Phân công tốt, giảm xung đột |
-| `EXP-003` | 2026-09-28 | **Proposed: Hybrid MARL + DP** | 12x12 (4 seeds) | IQL + DP cost + VI path | **23.8 ± 2.2** | **29.5 ± 8.4** | **16.5 ± 15.1** | **497.14 ms/day** | **Cao điểm nhất, tiết kiệm fuel vượt trội so với B3** |
+| `EXP-003` | 2026-09-28 | Proposed: Hybrid MARL + DP | 12x12 (4 seeds) | IQL + DP cost + VI path | 23.8 ± 2.2 | 29.5 ± 8.4 | 16.5 ± 15.1 | 497.14 ms/day | Cao điểm nhất, tiết kiệm fuel vượt trội so với B3 |
+| `EXP-004a` | 2026-09-28 | C1: No Refueling (Tournament) | 12x12 (4 seeds, 8 days) | Initial fuel 22, no refuel | 18.8 ± 6.5 | Nạp: 21.8 ± 18.7 | - | - | Khó mở rộng lộ trình dài ngày |
+| `EXP-004b` | 2026-09-28 | C2: Ad-Hoc Refueling (Tournament) | 12x12 (4 seeds, 8 days) | Refueler chases nearest patrol | 16.2 ± 6.5 | Nạp: 12.5 ± 9.6 | 3.9% Starvation | - | Đuổi bắt không đồng bộ, 1 xe bị cạn pin |
+| `EXP-004` | 2026-09-28 | **C3: Rendezvous Coordination (Proposed)** | 12x12 (4 seeds, 8 days) | Rendezvous meeting + sync wait | **23.8 ± 7.4** | **Nạp: 27.5 ± 9.4** | **0.0% Starvation** | **~490 ms/day** | **Điểm cao nhất, 0 xe chết đói, nạp đều đặn** (`plots/refuel_tournament.png`) |
 
 ---
 
@@ -21,7 +24,7 @@ Bảng ghi chép và theo dõi toàn bộ các lần chạy thí nghiệm, đán
 
 ### Run: EXP-001 (Phase 4 — Dynamic Programming Benchmark)
 - **Mục tiêu:** Đo đạc số Bellman sweep, runtime và so sánh policy giữa Value Iteration và Policy Iteration.
-- **Kết quả:** Value Iteration đạt hội tụ sau 11 sweeps (59.6ms), nhanh hơn 18.7 lần so với Policy Iteration (1,116ms).
+- **Kết quả:** Value Iteration đạt hội tụ sau 11 sweeps (59.6ms), nhanh hơn 18.7 lần so with Policy Iteration (1,116ms).
 - **Policy Agreement:** 100.0% trùng khớp hoàn hảo với Dijkstra.
 
 ### Run: EXP-002 (Phase 6 — Multi-Agent IQL Coordination)
@@ -30,16 +33,20 @@ Bảng ghi chép và theo dõi toàn bộ các lần chạy thí nghiệm, đán
 
 ### Run: EXP-003 (Phase 7 — Hierarchical Hybrid MARL + DP Benchmark)
 - **Mục tiêu:** So sánh toàn diện 5 phương pháp trên cùng môi trường đa ngày, đa hạt giống (Seeds 42, 101, 777, 999):
-  - B0 (Random)
-  - B1 (Greedy + Dijkstra)
-  - B2 (Greedy + DP)
-  - B3 (IQL + Dijkstra)
-  - Proposed (IQL + DP)
+  - B0 (Random), B1 (Greedy + Dijkstra), B2 (Greedy + DP), B3 (IQL + Dijkstra), Proposed (IQL + DP).
+- **Kết quả:** Hybrid MARL + DP đạt điểm trung bình cao nhất (23.8 ± 2.2), tiết kiệm nhiên liệu vượt trội (29.5 đơn vị), độ trễ 497.14ms/ngày (<1000ms).
+
+### Run: EXP-004 (Phase 8 — Fuel Management & Rendezvous Coordination Tournament)
+- **Mục tiêu:** Đánh giá hiệu quả cơ chế Refueling Coordination trên giải đấu dài hạn (8 ngày, ngân sách xăng khởi điểm chặt chẽ: 22 đơn vị cho Patrol, 90 cho Refueler).
+- **So sánh 3 cấu hình:**
+  1. `C1 (No Refueling)`: Xe tuần tra chỉ dùng nhiên liệu tự thân, hết xăng thì dừng.
+  2. `C2 (Ad-Hoc Refueling)`: Xe tiếp nhiên liệu chỉ bám đuổi xe tuần tra gần nhất, không chọn điểm hẹn và không đồng bộ thời gian.
+  3. `C3 (Rendezvous Coordination - Proposed)`: Phát hiện ngưỡng low-fuel (<40%), tự động chọn ô hẹn gặp tối ưu (Rendezvous Cell) và đồng bộ thời gian (Time Synchronization) để xe nhanh đợi xe chậm nạp nhiên liệu.
 - **Kết quả phân tích:**
-  - **Proposed (Hybrid MARL + DP)** đạt điểm trung bình cao nhất toàn diện: **23.8 ± 2.2**, vượt trội so với các baselines tham chiếu (B0: 7.5, B1/B2: 10.0, B3: 21.2).
-  - **Nhiên liệu (Fuel Efficiency):** Hybrid MARL + DP tiêu thụ trung bình chỉ **29.5 đơn vị nhiên liệu** (so với 51.2 của B3 và 75.8 của B0), nhờ cơ chế tính toán DP cost-to-go đưa vào state encoding và lộ trình chi phí tối thiểu của Value Iteration.
-  - **Thời gian ra quyết định (Latency):** Hybrid MARL + DP hoàn tất tính toán toàn bộ lịch trình ngày cho cả đội trong **~497.14 ms/ngày**, tuân thủ tuyệt đối giới hạn phản hồi (<1000ms) của PROCON Server.
-  - **Đồ thị so sánh:** Đã xuất biểu đồ tổng hợp 4 chỉ số tại [`plots/hybrid_comparison.png`](file:///d:/PythonProject/procon/plots/hybrid_comparison.png).
+  - **Điểm số (Team Score):** C3 đạt **23.8 ± 7.4**, vượt trội so với C1 (18.8) và C2 (16.2).
+  - **Hiệu quả tiếp nhiên liệu (Fuel Transferred):** C3 nạp thành công **27.5 ± 9.4 đơn vị xăng**, cao hơn gấp đôi so với Ad-Hoc C2 (12.5).
+  - **Tỷ lệ cạn kiệt nhiên liệu (Starvation Rate):** C3 đạt **0.0%** (hoàn toàn không có bước nào xe tuần tra bị bất động do hết xăng); trong khi C2 ghi nhận tỷ lệ bất động 3.9% (hạt giống 999 lên tới 15.6%) do xe tiếp xăng đuổi theo sau nhưng không bắt kịp lộ trình của xe tuần tra.
+  - **Biểu đồ trực quan:** Đã xuất biểu đồ 4 ô chi tiết tại [`plots/refuel_tournament.png`](file:///d:/PythonProject/procon/plots/refuel_tournament.png).
 
 ---
 

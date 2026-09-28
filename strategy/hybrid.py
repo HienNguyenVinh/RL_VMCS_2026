@@ -6,6 +6,7 @@ from client.protocol import ActionPlan, AgentKind, Direction, validate_action_pl
 from env.hex_grid import HexCoord, HexGrid
 from env.state import EnvAgent, SimulationState, UdonSpot
 from marl.iql import IndependentQLearning
+from marl.refuel_coordinator import RefuelCoordinator, RefuelRequest, RendezvousPlan
 from marl.state_encoder import StateEncoder
 from marl.task_allocator import MacroTask, TaskAllocator
 from planner.dijkstra import DijkstraPlanner
@@ -17,6 +18,7 @@ class HybridMARLDPStrategy:
     1. Multi-Agent RL (IQL) selects coordinated macro-tasks with conflict penalties.
     2. Dynamic Programming (Value Iteration) computes optimal minimum-cost routes.
     3. Low-level execution validates fuel, detects impossible targets, and applies fallback.
+    4. Refueling Coordinator handles low-fuel requests and rendezvous time synchronization.
     """
 
     def __init__(
@@ -28,14 +30,21 @@ class HybridMARLDPStrategy:
         gamma_marl: float = 0.90,
         lr_marl: float = 0.1,
         evaluation_mode: bool = True,
+        enable_refueling: bool = True,
+        low_fuel_threshold: float = 0.35,
     ):
         self.grid = grid
         self.num_agents = num_agents
+        self.enable_refueling = enable_refueling
         self.encoder = StateEncoder()
         self.allocator = TaskAllocator()
         self.dp_planner = ValueIteration(grid, gamma=gamma_dp)
         self.dijkstra_planner = DijkstraPlanner(grid)
+        self.refuel_coordinator = RefuelCoordinator(
+            grid, low_fuel_threshold=low_fuel_threshold
+        )
         self.last_assignments: Dict[int, int] = {}
+
 
         # Initialize IQL coordinator
         self.marl_coordinator = IndependentQLearning(
@@ -167,7 +176,32 @@ class HybridMARLDPStrategy:
         return plan[:day_steps]
 
     def plan_day(self, sim_state: SimulationState, day_steps: int) -> ActionPlan:
-        """Plan day steps for all agents combining MARL macro selection and DP path execution."""
+        """Plan day steps for all agents combining Refueling coordination, MARL macro selection and DP path execution."""
+        assigned_plans: Dict[int, List[int]] = {}
+
+        # 0. Check Refueling coordination for low-fuel patrol agents
+        if self.enable_refueling:
+            refuel_reqs = self.refuel_coordinator.check_refuel_requests(sim_state)
+            available_refuelers = self.refuel_coordinator.get_available_refuel_agents(sim_state)
+
+            refueler_idx = 0
+            for req in refuel_reqs:
+                if refueler_idx >= len(available_refuelers):
+                    break
+                patrol_agent = sim_state.get_agent(req.patrol_agent_id)
+                refuel_agent = available_refuelers[refueler_idx]
+                if patrol_agent and refuel_agent and patrol_agent.agent_id not in assigned_plans:
+                    _, r_plan = self.refuel_coordinator.find_rendezvous_cell(
+                        patrol=patrol_agent,
+                        refuel=refuel_agent,
+                        sim_state=sim_state,
+                        day_steps=day_steps,
+                    )
+                    if r_plan:
+                        assigned_plans[patrol_agent.agent_id] = r_plan.patrol_actions
+                        assigned_plans[refuel_agent.agent_id] = r_plan.refuel_actions
+                        refueler_idx += 1
+
         # 1. Compute DP cost-to-go maps for all active spots
         cost_maps, policy_maps = self.compute_dp_cost_to_go(sim_state)
 
@@ -178,6 +212,12 @@ class HybridMARLDPStrategy:
 
         for agent in sim_state.agents:
             a_id = agent.agent_id
+
+            # If agent is already assigned to a refueling rendezvous, use that plan
+            if a_id in assigned_plans:
+                plan.append(assigned_plans[a_id])
+                continue
+
             macro_task, _, _ = chosen_tasks[a_id]
             target_pos = macro_task.target_pos
 
@@ -190,6 +230,7 @@ class HybridMARLDPStrategy:
             if not self.grid.is_passable(target_pos):
                 plan.append(self._fallback_plan(agent, sim_state, day_steps))
                 continue
+
 
             # Use precomputed policy or run DP for specific target
             if target_pos in policy_maps:

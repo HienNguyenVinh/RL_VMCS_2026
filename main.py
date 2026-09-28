@@ -74,7 +74,7 @@ def main():
     parser = argparse.ArgumentParser(description="PTIT PROCON 2026 DP-MARL Bot")
     parser.add_argument(
         "--mode",
-        choices=["demo", "baseline", "dp", "single_rl", "marl", "hybrid", "server", "smoke_test"],
+        choices=["demo", "baseline", "dp", "single_rl", "marl", "hybrid", "tournament", "refuel", "server", "smoke_test"],
         default="demo",
         help="Execution mode (default: demo)",
     )
@@ -140,6 +140,10 @@ def main():
         elif args.mode == "hybrid":
             from experiments.run_hybrid import run_hybrid_comparison
             run_hybrid_comparison()
+        elif args.mode in ("tournament", "refuel"):
+            from experiments.run_tournament import run_refuel_tournament
+            run_refuel_tournament()
+
         elif args.mode in ("smoke_test", "server"):
             if not args.mock and (not match_id or not token):
                 print("\n[ERROR] Missing PROCON_MATCH_ID or PROCON_TOKEN.")
