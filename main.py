@@ -74,7 +74,7 @@ def main():
     parser = argparse.ArgumentParser(description="PTIT PROCON 2026 DP-MARL Bot")
     parser.add_argument(
         "--mode",
-        choices=["demo", "dp", "marl", "hybrid", "server"],
+        choices=["demo", "dp", "marl", "hybrid", "server", "smoke_test"],
         default="demo",
         help="Execution mode (default: demo)",
     )
@@ -83,6 +83,11 @@ def main():
         type=str,
         default=None,
         help="Path to YAML configuration file",
+    )
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Run against a local mock PROCON server (ideal for Phase 1 verification without live server)",
     )
     parser.add_argument(
         "--check-imports",
@@ -100,23 +105,61 @@ def main():
     config = load_config(args.config)
     setup_logger(config.get("logging", {}).get("level", "INFO"))
 
-    print(f"Mode: {args.mode}")
-    print(f"Server Base URL: {config.get('server', {}).get('base_url')}")
-    print(f"Match ID: {os.getenv('PROCON_MATCH_ID', 'Not set (using offline mode)')}")
+    base_url = config.get("server", {}).get("base_url", "https://procon.ptit.edu.vn")
+    match_id = os.getenv("PROCON_MATCH_ID", "")
+    token = os.getenv("PROCON_TOKEN", "")
 
-    if args.mode == "demo":
-        run_demo(config)
-    elif args.mode == "dp":
-        from experiments.run_dp import run_dp_experiment
-        run_dp_experiment()
-    elif args.mode == "marl":
-        from experiments.run_marl import run_marl_experiment
-        run_marl_experiment()
-    elif args.mode == "hybrid":
-        from experiments.run_hybrid import run_hybrid_benchmark
-        run_hybrid_benchmark()
-    elif args.mode == "server":
-        print("Server mode selected. Connects using client/http_client.py (Phase 1).")
+    mock_server = None
+    if args.mock:
+        from client.mock_server import MockProconServer
+        mock_server = MockProconServer(total_days=2, start_425_count=1)
+        base_url = mock_server.start()
+        match_id = match_id or "mock_match_001"
+        token = token or "mock_test_token"
+        print(f"[*] Started local Mock PROCON Server at {base_url}")
+
+    print(f"Mode: {args.mode}")
+    print(f"Server Base URL: {base_url}")
+    print(f"Match ID: {match_id if match_id else 'Not set'}")
+
+    try:
+        if args.mode == "demo":
+            run_demo(config)
+        elif args.mode == "dp":
+            from experiments.run_dp import run_dp_experiment
+            run_dp_experiment()
+        elif args.mode == "marl":
+            from experiments.run_marl import run_marl_experiment
+            run_marl_experiment()
+        elif args.mode == "hybrid":
+            from experiments.run_hybrid import run_hybrid_benchmark
+            run_hybrid_benchmark()
+        elif args.mode in ("smoke_test", "server"):
+            if not args.mock and (not match_id or not token):
+                print("\n[ERROR] Missing PROCON_MATCH_ID or PROCON_TOKEN.")
+                print("Please create a .env file from .env.example with your credentials,")
+                print("or test with the mock server using: python main.py --mode smoke_test --mock")
+                sys.exit(1)
+
+            from client.http_client import ProconHttpClient
+            from client.runner import MatchRunner
+
+            client = ProconHttpClient(
+                base_url=base_url,
+                match_id=match_id,
+                token=token,
+                min_poll_interval=float(config.get("server", {}).get("poll_interval", 0.25)),
+            )
+
+            # In smoke_test mode: strategy is None -> all agents stay still ([-1] * daySteps)
+            runner = MatchRunner(client=client, strategy_fn=None if args.mode == "smoke_test" else None)
+            outcome = runner.run()
+            print(f"\n[PHASE 1 COMPLETE] Match finished: {outcome}")
+
+    finally:
+        if mock_server:
+            mock_server.stop()
+            print("[*] Mock server stopped.")
 
 
 if __name__ == "__main__":

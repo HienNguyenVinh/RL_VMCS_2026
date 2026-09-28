@@ -189,6 +189,24 @@ python main.py --mode hybrid
 python experiments/run_hybrid.py
 ```
 
+### Chạy Smoke Test kết nối server (Tất cả agent đứng yên - Phase 1)
+
+Chạy kiểm thử với local mock server (mô phỏng toàn bộ chu trình match):
+```bash
+python main.py --mode smoke_test --mock
+```
+
+Chạy với PROCON server thật (sau khi điền token và match ID vào `.env`):
+```bash
+python main.py --mode smoke_test
+```
+
+### Chạy bot thi đấu trên PROCON server
+
+```bash
+python main.py --mode server
+```
+
 ### Chạy unit tests
 
 ```bash
@@ -210,7 +228,17 @@ python -m unittest discover tests
   - [x] Tạo branch strategy (`GIT_STRATEGY.md`)
   - [x] Tạo bảng log thí nghiệm (`experiments/experiment_log.md`)
   - [x] Kiểm thử toàn bộ module và `main.py`
-- [ ] **PHASE 1 — Kết nối server PROCON**
+- [x] **PHASE 1 — Kết nối server PROCON**
+  - [x] Triển khai `ProconHttpClient` chuẩn protocol PROCON 2026
+  - [x] Triển khai rate limiting (polling rate $\ge 200\text{ ms}$)
+  - [x] Xử lý lỗi `HTTP 425 Too Early` (chờ trận bắt đầu)
+  - [x] Xử lý lỗi `HTTP 429 Too Many Requests` (backoff & retry)
+  - [x] Xử lý lỗi `HTTP 401 Unauthorized`
+  - [x] Xác thực kế hoạch hành động (`validate_action_plan`)
+  - [x] Triển khai smoke test bot (các agent đứng yên `[-1] * day_steps`)
+  - [x] Triển khai `MockProconServer` phục vụ kiểm thử tự động
+  - [x] Triển khai `MatchRunner` điều phối toàn bộ chu trình trận đấu
+  - [x] Kiểm thử end-to-end thành công không lỗi
 - [ ] **PHASE 2 — Biểu diễn Hex Grid và bài toán MDP**
 - [ ] **PHASE 3 — Dynamic Programming Planner**
 - [ ] **PHASE 4 — Offline Multi-Agent RL cho phân công task**

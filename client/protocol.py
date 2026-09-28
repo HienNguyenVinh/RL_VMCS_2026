@@ -110,3 +110,79 @@ class MatchState:
 
 
 ActionPlan = List[List[int]]  # List of action steps for each agent, e.g. [[0, 1, -1], [5, 4, -1]]
+
+
+@dataclass
+class MatchResult:
+    """Final match result received from GET /result."""
+    match_id: str
+    winner: Optional[str] = None
+    scores: Dict[str, Any] = field(default_factory=dict)
+    finished: bool = True
+    raw: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, match_id: str, data: Dict[str, Any]) -> "MatchResult":
+        return cls(
+            match_id=match_id,
+            winner=data.get("winner"),
+            scores=data.get("scores", data.get("teamScores", {})),
+            finished=data.get("finished", True),
+            raw=data,
+        )
+
+
+class ProconError(Exception):
+    """Base exception for PROCON client errors."""
+    pass
+
+
+class ProconAuthError(ProconError):
+    """Raised when authentication fails (HTTP 401)."""
+    pass
+
+
+class ProconRateLimitError(ProconError):
+    """Raised when rate limit is exceeded (HTTP 429)."""
+    pass
+
+
+class ProconMatchNotStartedError(ProconError):
+    """Raised when match has not started yet (HTTP 425 timeout)."""
+    pass
+
+
+def validate_action_plan(actions: ActionPlan, num_agents: int, day_steps: int) -> None:
+    """Validate action plan format before submitting to server.
+    
+    Raises:
+        ValueError: If plan structure or direction values are invalid.
+    """
+    if not isinstance(actions, list):
+        raise ValueError(f"Action plan must be a list of lists, got {type(actions)}")
+
+    if len(actions) != num_agents:
+        raise ValueError(
+            f"Action plan agent count mismatch: expected {num_agents} agents, got {len(actions)}"
+        )
+
+    valid_directions = {-1, 0, 1, 2, 3, 4, 5}
+    for i, agent_plan in enumerate(actions):
+        if not isinstance(agent_plan, list):
+            raise ValueError(f"Agent {i} plan must be a list, got {type(agent_plan)}")
+
+        if len(agent_plan) > day_steps:
+            raise ValueError(
+                f"Agent {i} plan exceeds daySteps: {len(agent_plan)} > {day_steps}"
+            )
+
+        for step_idx, direction in enumerate(agent_plan):
+            if direction not in valid_directions:
+                raise ValueError(
+                    f"Agent {i} step {step_idx} invalid direction: {direction}. Must be in {valid_directions}"
+                )
+
+
+def create_idle_action_plan(num_agents: int, day_steps: int) -> ActionPlan:
+    """Create a smoke-test plan where all agents stay still for all steps."""
+    return [[Direction.STAY.value] * day_steps for _ in range(num_agents)]

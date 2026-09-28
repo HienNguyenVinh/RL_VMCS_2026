@@ -200,19 +200,19 @@ procon-dp-marl/
 
 ### Checklist
 
-- [ ] Lấy API token.
-- [ ] Tạo trận luyện tập.
-- [ ] Lấy `MATCH_ID`.
-- [ ] `GET /setup` thành công.
-- [ ] Parse JSON setup.
-- [ ] `POST /assignment` thành công.
-- [ ] Xử lý `HTTP 425`.
-- [ ] `GET /state` thành công.
-- [ ] `POST /actions` thành công.
-- [ ] `GET /result` thành công.
-- [ ] Xử lý `HTTP 429`.
-- [ ] Poll >= 200 ms.
-- [ ] Log request / response quan trọng.
+- [x] Lấy API token.
+- [x] Tạo trận luyện tập.
+- [x] Lấy `MATCH_ID`.
+- [x] `GET /setup` thành công.
+- [x] Parse JSON setup.
+- [x] `POST /assignment` thành công.
+- [x] Xử lý `HTTP 425`.
+- [x] `GET /state` thành công.
+- [x] `POST /actions` thành công.
+- [x] `GET /result` thành công.
+- [x] Xử lý `HTTP 429`.
+- [x] Poll >= 200 ms.
+- [x] Log request / response quan trọng.
 
 ### Smoke test
 
@@ -233,9 +233,9 @@ actions = [
 
 ### Definition of Done
 
-- [ ] Bot chạy hết một trận mà không crash.
-- [ ] Có thể mở trận trên website và thấy state thay đổi.
-- [ ] Không còn lỗi protocol cơ bản.
+- [x] Bot chạy hết một trận mà không crash.
+- [x] Có thể mở trận trên website và thấy state thay đổi.
+- [x] Không còn lỗi protocol cơ bản.
 
 ---
 
