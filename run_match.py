@@ -32,6 +32,13 @@ try:
 except ImportError:
     pass
 
+# Cấu hình logging hiển thị trực tiếp ra console
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+
 from client.http_client import ProconHttpClient
 from client.mock_server import MockProconServer
 from client.protocol import ProconAuthError

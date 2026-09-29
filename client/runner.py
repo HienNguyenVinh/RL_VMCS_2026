@@ -161,13 +161,11 @@ class MatchRunner:
         # Step 2: POST /assignment
         assignment = self.default_role_assignment(setup.num_agents)
         logger.info(f"[Phase 9] Assigning agent roles: {assignment}")
+        print(f"[*] Đã gán vai trò xe (POST /assignment): {assignment}")
         self.client.post_assignment(assignment)
 
-        # Step 3: GET /start (handling HTTP 425)
-        logger.info("[Phase 9] Waiting for match start (HTTP 425 handling)...")
-        self.client.wait_for_start(poll_interval=self.poll_interval)
-
-        # Step 4: Match loop
+        # Step 3: Match loop (poll GET /state directly matching BTC protocol)
+        print("[*] Đang đồng bộ và chờ ngày thi đấu đầu tiên...")
         day_counter = 0
         match_finished = False
 
@@ -180,12 +178,21 @@ class MatchRunner:
                 break
 
             if state is None:
+                # If we already played some days, check if match has finished
+                if self.last_acted_day >= 0:
+                    try:
+                        res = self.client.get_result()
+                        if res and (res.finished or res.scores or res.winner):
+                            logger.info("Match concluded according to /result.")
+                            match_finished = True
+                            break
+                    except Exception:
+                        pass
                 time.sleep(self.poll_interval)
                 continue
 
             # Strictly prevent duplicate actions for same day
             if state.day <= self.last_acted_day:
-                logger.debug(f"[Day {state.day}] Already acted for this day. Polling...")
                 time.sleep(self.poll_interval)
                 continue
 
@@ -215,11 +222,13 @@ class MatchRunner:
             server_resp = {}
             try:
                 server_resp = self.client.post_actions(actions, setup=setup)
+                print(f"  -> [Ngày {state.day}] Đã gửi kế hoạch hành động thành công ({len(actions)} xe, {latency_ms:.1f}ms).")
                 if server_resp.get("finished", False) or server_resp.get("status") == "finished":
                     logger.info("Server reported match completion in actions response.")
                     match_finished = True
             except Exception as e:
                 logger.error(f"[Day {state.day}] Error posting actions: {e}")
+                print(f"  ❌ [Ngày {state.day}] Lỗi gửi kế hoạch hành động: {e}")
                 break
 
             # Record telemetry
