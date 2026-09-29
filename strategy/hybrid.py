@@ -179,11 +179,13 @@ class HybridMARLDPStrategy:
         if hasattr(sim_state, "traffics") and sim_state.traffics is not None:
             self.grid.update_traffics(sim_state.traffics)
 
-        assigned_plans: Dict[int, List[int]] = {}
+        assigned_plans: Dict[int, Any] = {}
+        refuel_reqs: List[Any] = []
+        available_refuelers: List[Any] = []
 
         # 0. Check Refueling coordination for low-fuel patrol agents
         if self.enable_refueling:
-            refuel_reqs = self.refuel_coordinator.check_refuel_requests(sim_state)
+            refuel_reqs = self.refuel_coordinator.check_refuel_requests(sim_state, day_steps=day_steps)
             available_refuelers = self.refuel_coordinator.get_available_refuel_agents(sim_state)
 
             refueler_idx = 0
@@ -200,8 +202,17 @@ class HybridMARLDPStrategy:
                         day_steps=day_steps,
                     )
                     if r_plan:
-                        assigned_plans[patrol_agent.agent_id] = r_plan.patrol_actions
-                        assigned_plans[refuel_agent.agent_id] = r_plan.refuel_actions
+                        meet_step = max(r_plan.patrol_arrival_step, r_plan.refuel_arrival_step)
+                        assigned_plans[patrol_agent.agent_id] = (
+                            r_plan.patrol_actions,
+                            r_plan.rendezvous_cell,
+                            meet_step,
+                        )
+                        assigned_plans[refuel_agent.agent_id] = (
+                            r_plan.refuel_actions,
+                            r_plan.rendezvous_cell,
+                            meet_step,
+                        )
                         refueler_idx += 1
 
         # 1. Compute DP cost-to-go maps for all active spots
@@ -215,23 +226,91 @@ class HybridMARLDPStrategy:
         for agent in sim_state.agents:
             a_id = agent.agent_id
 
-            # 1. Refuel agent without assigned rendezvous -> stay still
+            # 1. Refuel agent without assigned rendezvous -> deploy centrally towards active spots
             if agent.kind == AgentKind.REFUEL and a_id not in assigned_plans:
+                active_spots = [
+                    s.pos for s in sim_state.spots
+                    if s.current_stock > 0 and self.grid.is_passable(s.pos)
+                ]
+                if active_spots:
+                    avg_r = sum(p // self.grid.width for p in active_spots) // len(active_spots)
+                    avg_c = sum(p % self.grid.width for p in active_spots) // len(active_spots)
+                    c_coord = HexCoord(avg_r, avg_c)
+                    center_target = min(
+                        active_spots,
+                        key=lambda p: c_coord.distance_to(HexCoord.from_index(p, self.grid.width))
+                    )
+                    dist = HexCoord.from_index(agent.pos, self.grid.width).distance_to(
+                        HexCoord.from_index(center_target, self.grid.width)
+                    )
+                    if dist > 2:
+                        res = self.dijkstra_planner.plan(
+                            start_index=agent.pos,
+                            target_indices=center_target,
+                            agent_kind=AgentKind.REFUEL,
+                            fuel_limit=1000,
+                        )
+                        if res.reachable and res.actions:
+                            r_actions = [a.value if hasattr(a, "value") else int(a) for a in res.actions]
+                            plan.append(
+                                self.grid.format_agent_actions(
+                                    start_pos=agent.pos,
+                                    actions=r_actions,
+                                    agent_kind=AgentKind.REFUEL,
+                                    day_steps=day_steps,
+                                    fuel=1000,
+                                )
+                            )
+                            continue
                 plan.append([-day_steps])
                 continue
 
-            # 2. If agent is already assigned to a refueling rendezvous, format and use that plan
+            # 2. If agent is already assigned to a refueling rendezvous
             if a_id in assigned_plans:
-                raw_plan = assigned_plans[a_id]
-                plan.append(
-                    self.grid.format_agent_actions(
-                        start_pos=agent.pos,
-                        actions=raw_plan,
-                        agent_kind=agent.kind,
-                        day_steps=day_steps,
-                        fuel=agent.fuel,
+                raw_actions, r_cell, meet_step = assigned_plans[a_id]
+                if agent.kind == AgentKind.REFUEL:
+                    plan.append(
+                        self.grid.format_agent_actions(
+                            start_pos=agent.pos,
+                            actions=raw_actions,
+                            agent_kind=agent.kind,
+                            day_steps=day_steps,
+                            fuel=agent.fuel,
+                        )
                     )
+                    continue
+
+                # Patrol agent: after rendezvous at r_cell, continue chaining to nearest active Udon spots
+                patrol_route = list(raw_actions[:meet_step])
+                curr_pos = r_cell
+                chain_visited = {agent.pos, curr_pos}
+                while len(patrol_route) < day_steps:
+                    next_candidates = [
+                        s.pos for s in sim_state.spots
+                        if s.pos not in chain_visited and s.current_stock > 0 and self.grid.is_passable(s.pos)
+                    ]
+                    if not next_candidates:
+                        break
+                    next_res = self.dijkstra_planner.plan(
+                        start_index=curr_pos,
+                        target_indices=next_candidates,
+                        agent_kind=AgentKind.PATROL,
+                        fuel_limit=agent.max_fuel,
+                    )
+                    if not next_res.reachable or not next_res.actions:
+                        break
+                    patrol_route.extend([a.value if hasattr(a, "value") else int(a) for a in next_res.actions])
+                    curr_pos = next_res.path[-1]
+                    chain_visited.add(curr_pos)
+
+                agent_plan = self.grid.format_agent_actions(
+                    start_pos=agent.pos,
+                    actions=patrol_route,
+                    agent_kind=agent.kind,
+                    day_steps=day_steps,
+                    fuel=agent.max_fuel,
                 )
+                plan.append(agent_plan)
                 continue
 
             macro_task, _, _ = chosen_tasks[a_id]
@@ -302,13 +381,18 @@ class HybridMARLDPStrategy:
                 curr_chain_pos = next_res.path[-1]
                 chain_visited.add(curr_chain_pos)
 
+            # If patrol agent has low fuel and cannot get refueled today, preserve fuel buffer so it won't hit 0 tomorrow
+            patrol_fuel = agent.fuel
+            if agent.kind == AgentKind.PATROL and agent.fuel <= 25 and len(refuel_reqs) > len(available_refuelers):
+                patrol_fuel = max(0, agent.fuel - 10)
+
             # Format actions to respect movement step costs and fuel limits without overflowing
             agent_plan = self.grid.format_agent_actions(
                 start_pos=agent.pos,
                 actions=route_actions,
                 agent_kind=agent.kind,
                 day_steps=day_steps,
-                fuel=agent.fuel,
+                fuel=patrol_fuel,
             )
             plan.append(agent_plan)
 

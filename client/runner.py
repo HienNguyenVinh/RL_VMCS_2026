@@ -75,15 +75,12 @@ class MatchRunner:
         self.telemetry_records: List[Dict[str, Any]] = []
 
     def default_role_assignment(self, num_agents: int) -> List[int]:
-        """Compute default role assignment (0: Patrol, 1: Refuel)."""
-        num_patrol = max(1, round(num_agents * self.patrol_ratio))
-        if num_agents >= 3 and num_patrol == num_agents:
-            num_patrol = num_agents - 1
-
-        assignment = [AgentKind.PATROL.value] * num_patrol + [
-            AgentKind.REFUEL.value
-        ] * (num_agents - num_patrol)
-        return assignment
+        """Compute default role assignment (0: Patrol, 1: Refuel).
+        Ensures exactly 1 Refuel agent when team > 1, maximizing scoring Patrol agents.
+        """
+        num_refuel = 1 if num_agents > 1 else 0
+        num_patrol = num_agents - num_refuel
+        return [AgentKind.PATROL.value] * num_patrol + [AgentKind.REFUEL.value] * num_refuel
 
     def _execute_strategy(
         self, setup: MatchSetup, state: MatchState

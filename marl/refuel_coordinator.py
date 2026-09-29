@@ -50,14 +50,17 @@ class RefuelCoordinator:
         self.critical_fuel_threshold = critical_fuel_threshold
         self.dijkstra = DijkstraPlanner(grid)
 
-    def check_refuel_requests(self, sim_state: SimulationState) -> List[RefuelRequest]:
+    def check_refuel_requests(
+        self, sim_state: SimulationState, day_steps: int = 30
+    ) -> List[RefuelRequest]:
         """Detect patrol agents needing refueling, sorted by urgency."""
         requests: List[RefuelRequest] = []
+        safe_buffer = max(20, int(day_steps * 0.65))
         for agent in sim_state.agents:
             if agent.kind == AgentKind.PATROL and agent.is_active:
                 ratio = agent.fuel / max(1, agent.max_fuel)
-                # Only request refuel if fuel is genuinely low in absolute terms (<= 15) AND below threshold
-                if agent.fuel <= 15 and ratio <= self.low_fuel_threshold:
+                # Request refuel if fuel cannot safely cover next day's full patrol or ratio is low
+                if agent.fuel <= safe_buffer or ratio <= self.low_fuel_threshold:
                     requests.append(
                         RefuelRequest(
                             patrol_agent_id=agent.agent_id,
