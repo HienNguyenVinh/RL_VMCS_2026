@@ -19,14 +19,17 @@ class GreedyStrategy:
         plan: ActionPlan = []
 
         for agent in sim_state.agents:
-            agent_plan: List[int] = []
+            if agent.kind == AgentKind.REFUEL:
+                plan.append([-day_steps])
+                continue
+
+            raw_actions: List[int] = []
             curr_pos = agent.pos
-            curr_fuel = agent.fuel
+            curr_coord = HexCoord.from_index(curr_pos, self.grid.width)
 
             # Find nearest spot with stock
             nearest_target = curr_pos
             min_dist = float("inf")
-            curr_coord = HexCoord.from_index(curr_pos, self.grid.width)
 
             for spot in sim_state.spots:
                 if spot.current_stock > 0 and self.grid.is_passable(spot.pos):
@@ -40,8 +43,7 @@ class GreedyStrategy:
             for _ in range(day_steps):
                 curr_c = HexCoord.from_index(curr_pos, self.grid.width)
                 if curr_c == target_coord:
-                    agent_plan.append(Direction.STAY.value)
-                    continue
+                    break
 
                 best_dir = Direction.STAY
                 best_dist = curr_c.distance_to(target_coord)
@@ -50,25 +52,29 @@ class GreedyStrategy:
                     nxt = self.grid.get_neighbor(curr_c.row, curr_c.col, d)
                     if nxt is not None and self.grid.is_passable(nxt.to_index(self.grid.width)):
                         nxt_idx = nxt.to_index(self.grid.width)
-                        _, f_cost = self.grid.get_movement_cost(curr_pos, nxt_idx, agent.kind)
-                        if curr_fuel >= f_cost:
-                            dist = nxt.distance_to(target_coord)
-                            if dist < best_dist:
-                                best_dist = dist
-                                best_dir = d
+                        dist = nxt.distance_to(target_coord)
+                        if dist < best_dist:
+                            best_dist = dist
+                            best_dir = d
 
-                agent_plan.append(best_dir.value)
-                if best_dir != Direction.STAY:
-                    nxt_idx = self.grid.get_neighbor_index(curr_pos, best_dir)
-                    if nxt_idx is not None:
-                        _, f_cost = self.grid.get_movement_cost(curr_pos, nxt_idx, agent.kind)
-                        curr_fuel = max(0, curr_fuel - f_cost)
-                        curr_pos = nxt_idx
+                if best_dir == Direction.STAY:
+                    break
 
-            while len(agent_plan) < day_steps:
-                agent_plan.append(Direction.STAY.value)
+                raw_actions.append(best_dir.value)
+                nxt_idx = self.grid.get_neighbor_index(curr_pos, best_dir)
+                if nxt_idx is not None:
+                    curr_pos = nxt_idx
+                else:
+                    break
 
-            plan.append(agent_plan[:day_steps])
+            agent_plan = self.grid.format_agent_actions(
+                start_pos=agent.pos,
+                actions=raw_actions,
+                agent_kind=agent.kind,
+                day_steps=day_steps,
+                fuel=agent.fuel,
+            )
+            plan.append(agent_plan)
 
         validate_action_plan(plan, len(sim_state.agents), day_steps)
         return plan
@@ -86,9 +92,11 @@ class GreedyDijkstraStrategy:
         plan: ActionPlan = []
 
         for agent in sim_state.agents:
-            agent_plan: List[int] = []
+            if agent.kind == AgentKind.REFUEL:
+                plan.append([-day_steps])
+                continue
+
             curr_pos = agent.pos
-            curr_fuel = agent.fuel
 
             # 1. Greedy target selection
             target_pos = curr_pos
@@ -106,30 +114,25 @@ class GreedyDijkstraStrategy:
                     target_pos = patrols[0].pos
 
             # 2. Dijkstra path planning
+            raw_actions: List[int] = []
             if target_pos != curr_pos:
                 path_res = self.dijkstra.plan(
                     start_index=curr_pos,
                     target_indices=target_pos,
                     agent_kind=agent.kind,
-                    fuel_limit=curr_fuel,
+                    fuel_limit=agent.fuel,
                 )
                 if path_res.reachable and path_res.actions:
-                    for act in path_res.actions:
-                        nxt_pos = self.grid.get_neighbor_index(curr_pos, act)
-                        if nxt_pos is not None:
-                            _, f_cost = self.grid.get_movement_cost(curr_pos, nxt_pos, agent.kind)
-                            if curr_fuel >= f_cost:
-                                agent_plan.append(act.value)
-                                curr_fuel -= f_cost
-                                curr_pos = nxt_pos
-                            else:
-                                break
+                    raw_actions = [a.value if hasattr(a, "value") else int(a) for a in path_res.actions]
 
-            # 3. Pad remaining steps with STAY (-1)
-            while len(agent_plan) < day_steps:
-                agent_plan.append(Direction.STAY.value)
-
-            plan.append(agent_plan[:day_steps])
+            agent_plan = self.grid.format_agent_actions(
+                start_pos=agent.pos,
+                actions=raw_actions,
+                agent_kind=agent.kind,
+                day_steps=day_steps,
+                fuel=agent.fuel,
+            )
+            plan.append(agent_plan)
 
         validate_action_plan(plan, len(sim_state.agents), day_steps)
         return plan
@@ -147,9 +150,11 @@ class GreedyDPStrategy:
         plan: ActionPlan = []
 
         for agent in sim_state.agents:
-            agent_plan: List[int] = []
+            if agent.kind == AgentKind.REFUEL:
+                plan.append([-day_steps])
+                continue
+
             curr_pos = agent.pos
-            curr_fuel = agent.fuel
 
             # Greedy target selection
             target_pos = curr_pos
@@ -166,26 +171,23 @@ class GreedyDPStrategy:
                     patrols.sort(key=lambda p: curr_coord.distance_to(HexCoord.from_index(p.pos, self.grid.width)))
                     target_pos = patrols[0].pos
 
+            raw_actions: List[int] = []
             if target_pos != curr_pos:
                 policy, _, _ = self.planner.plan([target_pos])
                 path, actions, reached = self.planner.extract_route(
                     start=curr_pos, target_indices=[target_pos], policy=policy, max_steps=day_steps
                 )
-                for act in actions:
-                    nxt = self.grid.get_neighbor_index(curr_pos, act)
-                    if nxt is not None:
-                        _, f_cost = self.grid.get_movement_cost(curr_pos, nxt, agent.kind)
-                        if curr_fuel >= f_cost:
-                            agent_plan.append(act.value)
-                            curr_fuel -= f_cost
-                            curr_pos = nxt
-                        else:
-                            break
+                if reached and actions:
+                    raw_actions = [a.value if hasattr(a, "value") else int(a) for a in actions]
 
-            while len(agent_plan) < day_steps:
-                agent_plan.append(Direction.STAY.value)
-
-            plan.append(agent_plan[:day_steps])
+            agent_plan = self.grid.format_agent_actions(
+                start_pos=agent.pos,
+                actions=raw_actions,
+                agent_kind=agent.kind,
+                day_steps=day_steps,
+                fuel=agent.fuel,
+            )
+            plan.append(agent_plan)
 
         validate_action_plan(plan, len(sim_state.agents), day_steps)
         return plan

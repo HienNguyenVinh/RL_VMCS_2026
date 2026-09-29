@@ -241,3 +241,58 @@ class HexGrid:
         """Backward compatible helper returning step cost."""
         steps, _ = self.get_movement_cost(from_index, to_index, AgentKind.PATROL)
         return steps
+
+    def format_agent_actions(
+        self,
+        start_pos: int,
+        actions: List[int],
+        agent_kind: AgentKind = AgentKind.PATROL,
+        day_steps: int = 30,
+        fuel: int = 1000,
+    ) -> List[int]:
+        """Format an action sequence into a valid server action list conforming to BTC protocol.
+
+        Ensures:
+        - Movement step costs (plain=2, mountain=3, road=1/2/4) are tracked accurately.
+        - Steps do not exceed day_steps (prevents E_STEP_OVERFLOW).
+        - Fuel consumption is respected.
+        - Remaining step budget is padded with -(day_steps - used_steps).
+        - Agents with no moves return [-day_steps].
+        """
+        curr = start_pos
+        curr_fuel = fuel
+        used_steps = 0
+        safe_plan: List[int] = []
+
+        for act in actions:
+            if act < 0:
+                # Negative value means stay for |act| steps
+                stay_len = abs(act)
+                if used_steps + stay_len <= day_steps:
+                    safe_plan.append(-stay_len)
+                    used_steps += stay_len
+                else:
+                    rem = day_steps - used_steps
+                    if rem > 0:
+                        safe_plan.append(-rem)
+                        used_steps += rem
+                    break
+            else:
+                dir_val = Direction(act) if not isinstance(act, Direction) else act
+                nxt = self.get_neighbor_index(curr, dir_val)
+                if nxt is None or not self.is_passable(nxt):
+                    break
+                s_cost, f_cost = self.get_movement_cost(curr, nxt, agent_kind)
+                s_cost = int(s_cost)
+                if used_steps + s_cost <= day_steps and curr_fuel >= f_cost:
+                    safe_plan.append(act)
+                    used_steps += s_cost
+                    curr_fuel -= f_cost
+                    curr = nxt
+                else:
+                    break
+
+        if used_steps < day_steps:
+            safe_plan.append(-(day_steps - used_steps))
+
+        return safe_plan if safe_plan else [-day_steps]

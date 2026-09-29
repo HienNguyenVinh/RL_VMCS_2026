@@ -1,7 +1,7 @@
 """DP-Only Strategy for PTIT PROCON 2026."""
 from typing import Dict, List, Optional
 
-from client.protocol import ActionPlan, Direction, validate_action_plan
+from client.protocol import ActionPlan, AgentKind, Direction, validate_action_plan
 from env.hex_grid import HexGrid
 from env.state import SimulationState
 from planner.value_iteration import ValueIteration
@@ -31,38 +31,41 @@ class DPOnlyStrategy:
 
         if not targets:
             # No reachable targets; all stay
-            return [[Direction.STAY.value] * day_steps for _ in range(len(sim_state.agents))]
+            return [[-day_steps] for _ in range(len(sim_state.agents))]
 
         policy, _, _ = self.planner.plan(targets)
 
         plan: ActionPlan = []
         for agent in sim_state.agents:
-            agent_plan: List[int] = []
+            if agent.kind == AgentKind.REFUEL:
+                plan.append([-day_steps])
+                continue
+
+            raw_actions: List[int] = []
             curr = agent.pos
-            curr_fuel = agent.fuel
+            visited = {curr}
 
             for _ in range(day_steps):
                 action = policy.get(curr, Direction.STAY)
                 if action == Direction.STAY:
-                    agent_plan.append(Direction.STAY.value)
-                    continue
+                    break
 
                 nxt = self.grid.get_neighbor_index(curr, action)
-                if nxt is not None and self.grid.is_passable(nxt):
-                    _, f_cost = self.grid.get_movement_cost(curr, nxt, agent.kind)
-                    if curr_fuel >= f_cost:
-                        agent_plan.append(action.value)
-                        curr_fuel -= f_cost
-                        curr = nxt
-                    else:
-                        agent_plan.append(Direction.STAY.value)
-                else:
-                    agent_plan.append(Direction.STAY.value)
+                if nxt is None or nxt in visited or not self.grid.is_passable(nxt):
+                    break
 
-            while len(agent_plan) < day_steps:
-                agent_plan.append(Direction.STAY.value)
+                raw_actions.append(action.value)
+                visited.add(nxt)
+                curr = nxt
 
-            plan.append(agent_plan[:day_steps])
+            agent_plan = self.grid.format_agent_actions(
+                start_pos=agent.pos,
+                actions=raw_actions,
+                agent_kind=agent.kind,
+                day_steps=day_steps,
+                fuel=agent.fuel,
+            )
+            plan.append(agent_plan)
 
         validate_action_plan(plan, len(sim_state.agents), day_steps)
         return plan

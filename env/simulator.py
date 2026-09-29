@@ -162,12 +162,16 @@ class HexGridSimulator:
             # ActionPlan format: list of plans for each agent
             for a_idx, p in enumerate(actions):
                 if p:
-                    step_actions[a_idx] = Direction(p[0])
+                    d = p[0]
+                    step_actions[a_idx] = Direction.STAY if (isinstance(d, int) and d < 0) else (Direction(d) if not isinstance(d, Direction) else d)
                 else:
                     step_actions[a_idx] = Direction.STAY
         else:
             for a_id, d in actions.items():
-                step_actions[a_id] = Direction(d) if not isinstance(d, Direction) else d
+                if isinstance(d, int) and d < 0:
+                    step_actions[a_id] = Direction.STAY
+                else:
+                    step_actions[a_id] = Direction(d) if not isinstance(d, Direction) else d
 
         collected_per_agent: Dict[int, int] = {a.agent_id: 0 for a in self.state.agents}
         new_positions: Dict[int, int] = {}

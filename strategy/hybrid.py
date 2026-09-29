@@ -133,12 +133,15 @@ class HybridMARLDPStrategy:
         self, agent: EnvAgent, sim_state: SimulationState, day_steps: int
     ) -> List[int]:
         """Fallback: Dijkstra to nearest reachable active spot, or stand still."""
+        if agent.kind == AgentKind.REFUEL:
+            return [-day_steps]
+
         active_spots = [
             s for s in sim_state.spots
             if s.current_stock > 0 and self.grid.is_passable(s.pos)
         ]
         if not active_spots or agent.fuel <= 0:
-            return [Direction.STAY.value] * day_steps
+            return [-day_steps]
 
         # Find nearest spot via Hex distance
         agent_coord = HexCoord.from_index(agent.pos, self.grid.width)
@@ -154,26 +157,16 @@ class HybridMARLDPStrategy:
             fuel_limit=agent.fuel,
         )
 
-        plan: List[int] = []
-        curr = agent.pos
-        curr_fuel = agent.fuel
+        if not path_res.reachable or not path_res.actions:
+            return [-day_steps]
 
-        if path_res.reachable and path_res.actions:
-            for act in path_res.actions:
-                nxt = self.grid.get_neighbor_index(curr, act)
-                if nxt is not None and self.grid.is_passable(nxt):
-                    _, f_cost = self.grid.get_movement_cost(curr, nxt, agent.kind)
-                    if curr_fuel >= f_cost:
-                        plan.append(act.value)
-                        curr_fuel -= f_cost
-                        curr = nxt
-                    else:
-                        break
-
-        while len(plan) < day_steps:
-            plan.append(Direction.STAY.value)
-
-        return plan[:day_steps]
+        return self.grid.format_agent_actions(
+            start_pos=agent.pos,
+            actions=[a.value if hasattr(a, "value") else int(a) for a in path_res.actions],
+            agent_kind=agent.kind,
+            day_steps=day_steps,
+            fuel=agent.fuel,
+        )
 
     def plan_day(self, sim_state: SimulationState, day_steps: Any) -> ActionPlan:
         """Plan day steps for all agents combining Refueling coordination, MARL macro selection and DP path execution."""
@@ -218,17 +211,31 @@ class HybridMARLDPStrategy:
         for agent in sim_state.agents:
             a_id = agent.agent_id
 
-            # If agent is already assigned to a refueling rendezvous, use that plan
+            # 1. Refuel agent without assigned rendezvous -> stay still
+            if agent.kind == AgentKind.REFUEL and a_id not in assigned_plans:
+                plan.append([-day_steps])
+                continue
+
+            # 2. If agent is already assigned to a refueling rendezvous, format and use that plan
             if a_id in assigned_plans:
-                plan.append(assigned_plans[a_id])
+                raw_plan = assigned_plans[a_id]
+                plan.append(
+                    self.grid.format_agent_actions(
+                        start_pos=agent.pos,
+                        actions=raw_plan,
+                        agent_kind=agent.kind,
+                        day_steps=day_steps,
+                        fuel=agent.fuel,
+                    )
+                )
                 continue
 
             macro_task, _, _ = chosen_tasks[a_id]
             target_pos = macro_task.target_pos
 
-            # Check standby or already at target
+            # 3. Check standby or already at target
             if macro_task.task_type == "STANDBY" or target_pos == agent.pos:
-                plan.append([Direction.STAY.value] * day_steps)
+                plan.append([-day_steps])
                 continue
 
             # Detect impossible target (impassable cell)
@@ -236,8 +243,7 @@ class HybridMARLDPStrategy:
                 plan.append(self._fallback_plan(agent, sim_state, day_steps))
                 continue
 
-
-            # Use precomputed policy or run DP for specific target
+            # 4. Use precomputed policy or run DP for specific target
             if target_pos in policy_maps:
                 policy = policy_maps[target_pos]
             else:
@@ -257,29 +263,15 @@ class HybridMARLDPStrategy:
                 plan.append(self._fallback_plan(agent, sim_state, day_steps))
                 continue
 
-            # Fuel validation: truncate route if fuel depleted
-            agent_plan: List[int] = []
-            curr = agent.pos
-            curr_fuel = agent.fuel
-
-            for act in actions:
-                nxt = self.grid.get_neighbor_index(curr, act)
-                if nxt is not None and self.grid.is_passable(nxt):
-                    _, f_cost = self.grid.get_movement_cost(curr, nxt, agent.kind)
-                    if curr_fuel >= f_cost:
-                        agent_plan.append(act.value)
-                        curr_fuel -= f_cost
-                        curr = nxt
-                    else:
-                        break
-                else:
-                    break
-
-            # Pad remaining steps with STAY (-1) up to day_steps
-            while len(agent_plan) < day_steps:
-                agent_plan.append(Direction.STAY.value)
-
-            plan.append(agent_plan[:day_steps])
+            # Format actions to respect movement step costs and fuel limits without overflowing
+            agent_plan = self.grid.format_agent_actions(
+                start_pos=agent.pos,
+                actions=[a.value if hasattr(a, "value") else int(a) for a in actions],
+                agent_kind=agent.kind,
+                day_steps=day_steps,
+                fuel=agent.fuel,
+            )
+            plan.append(agent_plan)
 
         # Validate action plan
         validate_action_plan(plan, len(sim_state.agents), day_steps)
@@ -325,11 +317,15 @@ class IQLDijkstraStrategy:
 
         for agent in sim_state.agents:
             a_id = agent.agent_id
+            if agent.kind == AgentKind.REFUEL:
+                plan.append([-day_steps])
+                continue
+
             macro_task, _, _ = chosen_tasks[a_id]
             target_pos = macro_task.target_pos
 
             if macro_task.task_type == "STANDBY" or target_pos == agent.pos or not self.grid.is_passable(target_pos):
-                plan.append([Direction.STAY.value] * day_steps)
+                plan.append([-day_steps])
                 continue
 
             path_res = self.dijkstra_planner.plan(
@@ -339,26 +335,18 @@ class IQLDijkstraStrategy:
                 fuel_limit=agent.fuel,
             )
 
-            agent_plan: List[int] = []
-            curr = agent.pos
-            curr_fuel = agent.fuel
+            if not path_res.reachable or not path_res.actions:
+                plan.append([-day_steps])
+                continue
 
-            if path_res.reachable and path_res.actions:
-                for act in path_res.actions:
-                    nxt = self.grid.get_neighbor_index(curr, act)
-                    if nxt is not None and self.grid.is_passable(nxt):
-                        _, f_cost = self.grid.get_movement_cost(curr, nxt, agent.kind)
-                        if curr_fuel >= f_cost:
-                            agent_plan.append(act.value)
-                            curr_fuel -= f_cost
-                            curr = nxt
-                        else:
-                            break
-
-            while len(agent_plan) < day_steps:
-                agent_plan.append(Direction.STAY.value)
-
-            plan.append(agent_plan[:day_steps])
+            agent_plan = self.grid.format_agent_actions(
+                start_pos=agent.pos,
+                actions=[a.value if hasattr(a, "value") else int(a) for a in path_res.actions],
+                agent_kind=agent.kind,
+                day_steps=day_steps,
+                fuel=agent.fuel,
+            )
+            plan.append(agent_plan)
 
         validate_action_plan(plan, len(sim_state.agents), day_steps)
         return plan

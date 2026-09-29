@@ -90,10 +90,10 @@ class TestHybridStrategy(unittest.TestCase):
 
         # Plan must be valid
         validate_action_plan(plan, len(self.sim.state.agents), self.sim.day_steps)
-        self.assertEqual(len(plan[0]), self.sim.day_steps)
+        self.assertLessEqual(len(plan[0]), self.sim.day_steps)
 
         # At most 1 movement step possible with 1 fuel
-        move_steps = [a for a in plan[0] if a != Direction.STAY.value]
+        move_steps = [a for a in plan[0] if a >= 0]
         self.assertLessEqual(len(move_steps), 1)
 
 
@@ -128,10 +128,10 @@ class TestHybridStrategy(unittest.TestCase):
             plan = strat.plan_day(self.sim.state, self.sim.day_steps)
             self.assertEqual(len(plan), len(self.sim.state.agents), f"Strategy {name} agent count mismatch")
             for i, p in enumerate(plan):
-                self.assertEqual(
+                self.assertLessEqual(
                     len(p),
                     self.sim.day_steps,
-                    f"Strategy {name} agent {i} step count mismatch: {len(p)} vs {self.sim.day_steps}",
+                    f"Strategy {name} agent {i} step count exceeds day_steps: {len(p)} vs {self.sim.day_steps}",
                 )
             # Should pass validation without error
             validate_action_plan(plan, len(self.sim.state.agents), self.sim.day_steps)
@@ -144,7 +144,10 @@ class TestHybridStrategy(unittest.TestCase):
         for day in range(num_days):
             plan = self.strategy.plan_day(self.sim.state, self.sim.day_steps)
             for step_idx in range(self.sim.day_steps):
-                step_actions = {a_id: plan[a_id][step_idx] for a_id in range(len(self.sim.state.agents))}
+                step_actions = {
+                    a_id: (plan[a_id][step_idx] if step_idx < len(plan[a_id]) and plan[a_id][step_idx] >= 0 else Direction.STAY.value)
+                    for a_id in range(len(self.sim.state.agents))
+                }
                 next_state, rewards, done, info = self.sim.step(step_actions)
                 self.assertIsNotNone(next_state)
 

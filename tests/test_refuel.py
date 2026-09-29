@@ -133,7 +133,10 @@ class TestRefuelCoordination(unittest.TestCase):
         validate_action_plan(plan, len(self.sim.state.agents), self.sim.day_steps)
 
         for s in range(self.sim.day_steps):
-            step_acts = {a.agent_id: plan[a.agent_id][s] for a in self.sim.state.agents}
+            step_acts = {
+                a.agent_id: (plan[a.agent_id][s] if s < len(plan[a.agent_id]) and plan[a.agent_id][s] >= 0 else Direction.STAY.value)
+                for a in self.sim.state.agents
+            }
             self.sim.step(step_acts)
 
         # Verification: agent 0 was coordinated and received fuel or avoided stall

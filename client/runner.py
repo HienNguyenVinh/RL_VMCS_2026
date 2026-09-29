@@ -11,8 +11,15 @@ from datetime import datetime
 import json
 import logging
 from pathlib import Path
+import sys
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 
 from client.http_client import ProconHttpClient
@@ -222,7 +229,14 @@ class MatchRunner:
             server_resp = {}
             try:
                 server_resp = self.client.post_actions(actions, setup=setup)
-                print(f"  -> [Ngày {state.day}] Đã gửi kế hoạch hành động thành công ({len(actions)} xe, {latency_ms:.1f}ms).")
+                is_valid = server_resp.get("valid", True)
+                if is_valid is False:
+                    reason = server_resp.get("reason", "Server rejected plan")
+                    logger.error(f"[Day {state.day}] Server TỪ CHỐI kế hoạch hành động: {reason}")
+                    print(f"  ❌ [Ngày {state.day}] Server TỪ CHỐI kế hoạch: {reason}")
+                else:
+                    print(f"  -> [Ngày {state.day}] Server CHẤP NHẬN kế hoạch ({len(actions)} xe, {latency_ms:.1f}ms).")
+
                 if server_resp.get("finished", False) or server_resp.get("status") == "finished":
                     logger.info("Server reported match completion in actions response.")
                     match_finished = True
