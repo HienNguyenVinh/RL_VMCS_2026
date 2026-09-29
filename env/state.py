@@ -17,16 +17,26 @@ class UdonSpot:
     visited_by_agents: List[int] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], default_id: int = 0) -> "UdonSpot":
-        pos = data.get("pos", 0)
-        stock = data.get("stock", data.get("current_stock", 10))
-        return cls(
-            spot_id=data.get("id", default_id),
-            pos=pos,
-            udon_type=data.get("type", 0),
-            initial_stock=stock,
-            current_stock=stock,
-        )
+    def from_dict(cls, data: Any, default_id: int = 0) -> "UdonSpot":
+        if isinstance(data, int):
+            return cls(
+                spot_id=default_id,
+                pos=data,
+                udon_type=0,
+                initial_stock=10,
+                current_stock=10,
+            )
+        elif isinstance(data, dict):
+            pos = data.get("pos", 0)
+            stock = data.get("stock", data.get("current_stock", 10))
+            return cls(
+                spot_id=data.get("id", default_id),
+                pos=pos,
+                udon_type=data.get("type", 0),
+                initial_stock=stock,
+                current_stock=stock,
+            )
+        return cls(spot_id=default_id, pos=0, udon_type=0, initial_stock=10, current_stock=10)
 
 
 @dataclass
@@ -78,12 +88,20 @@ class SimulationState:
         """Build SimulationState from server MatchSetup and MatchState."""
         grid = HexGrid.from_setup(setup)
 
+        # Parse fuel limit robustly (handles dict, number multiplier, or None)
+        fuel_limits = setup.fuel_limits if isinstance(setup.fuel_limits, dict) else {}
+        multiplier = setup.fuel_limits if isinstance(setup.fuel_limits, (int, float)) else 1.0
+
         agents: List[EnvAgent] = []
         for a in state.agents:
-            fuel_limit = setup.fuel_limits.get(
-                "patrol" if a.kind == AgentKind.PATROL else "refuel",
-                50 if a.kind == AgentKind.PATROL else 100,
-            )
+            base_limit = 50 if a.kind == AgentKind.PATROL else 100
+            if fuel_limits:
+                fuel_limit = fuel_limits.get(
+                    "patrol" if a.kind == AgentKind.PATROL else "refuel", base_limit
+                )
+            else:
+                fuel_limit = int(base_limit * multiplier) if multiplier > 0 else base_limit
+
             agents.append(
                 EnvAgent(
                     agent_id=a.agent_id,
@@ -99,11 +117,29 @@ class SimulationState:
         for idx, s in enumerate(setup.spots):
             spots.append(UdonSpot.from_dict(s, default_id=idx))
 
+        # Normalize traffics to flat list of ints of length grid.num_cells
+        traffic_array = [0] * grid.num_cells
+        if isinstance(state.traffics, list):
+            for idx, item in enumerate(state.traffics):
+                if isinstance(item, dict) and "pos" in item:
+                    p = item.get("pos", 0)
+                    if 0 <= p < grid.num_cells:
+                        traffic_array[p] = item.get("status", 0)
+                elif isinstance(item, int) and idx < grid.num_cells:
+                    traffic_array[idx] = item
+        elif isinstance(state.traffics, dict):
+            for p, st in state.traffics.items():
+                if isinstance(p, int) and 0 <= p < grid.num_cells:
+                    traffic_array[p] = st
+
+        # Sync grid traffic levels
+        grid.traffic_levels = list(traffic_array)
+
         return cls(
             day=state.day,
             step=0,
             grid=grid,
             agents=agents,
             spots=spots,
-            traffics=state.traffics or [0] * grid.num_cells,
+            traffics=traffic_array,
         )

@@ -175,8 +175,13 @@ class HybridMARLDPStrategy:
 
         return plan[:day_steps]
 
-    def plan_day(self, sim_state: SimulationState, day_steps: int) -> ActionPlan:
+    def plan_day(self, sim_state: SimulationState, day_steps: Any) -> ActionPlan:
         """Plan day steps for all agents combining Refueling coordination, MARL macro selection and DP path execution."""
+        if isinstance(day_steps, list):
+            day_steps = day_steps[sim_state.day] if 0 <= sim_state.day < len(day_steps) else 30
+        elif not isinstance(day_steps, int) or day_steps <= 0:
+            day_steps = 30
+
         assigned_plans: Dict[int, List[int]] = {}
 
         # 0. Check Refueling coordination for low-fuel patrol agents

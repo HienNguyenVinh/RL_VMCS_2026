@@ -204,6 +204,12 @@ def validate_action_plan(actions: ActionPlan, num_agents: int, day_steps: Any = 
                 )
 
 
-def create_idle_action_plan(num_agents: int, day_steps: int) -> ActionPlan:
+def create_idle_action_plan(num_agents: int, day_steps: Any) -> ActionPlan:
     """Create a plan where all agents stay still for all steps."""
-    return [[Direction.STAY.value] * day_steps for _ in range(num_agents)]
+    if isinstance(day_steps, list):
+        steps = day_steps[0] if day_steps else 30
+    elif isinstance(day_steps, int) and day_steps > 0:
+        steps = day_steps
+    else:
+        steps = 30
+    return [[Direction.STAY.value] * steps for _ in range(num_agents)]

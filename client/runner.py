@@ -84,30 +84,31 @@ class MatchRunner:
         """Execute strategy with latency measurement, fallback protection, and validation."""
         start_t = time.perf_counter()
         plan_source = "hybrid"
+        steps_today = setup.get_steps_for_day(state.day)
 
         try:
             if self.strategy is None:
                 # Default Smoke Test / Idle strategy
-                actions = create_idle_action_plan(setup.num_agents, setup.day_steps)
+                actions = create_idle_action_plan(setup.num_agents, steps_today)
                 plan_source = "idle_default"
             elif isinstance(self.strategy, HybridMARLDPStrategy):
                 # Convert MatchState + MatchSetup into SimulationState
                 sim_state = SimulationState.from_match(setup, state)
-                actions = self.strategy.plan_day(sim_state, setup.day_steps)
+                actions = self.strategy.plan_day(sim_state, steps_today)
                 plan_source = "hybrid_marl_dp"
             elif callable(self.strategy):
                 actions = self.strategy(setup, state)
                 plan_source = "custom_fn"
             else:
-                actions = create_idle_action_plan(setup.num_agents, setup.day_steps)
+                actions = create_idle_action_plan(setup.num_agents, steps_today)
                 plan_source = "fallback_unknown"
 
             # Validate action plan format
-            validate_action_plan(actions, setup.num_agents, setup.day_steps)
+            validate_action_plan(actions, setup.num_agents, steps_today)
 
         except Exception as e:
             logger.error(f"[Day {state.day}] Strategy execution failed: {e}. Activating Idle Fallback!")
-            actions = create_idle_action_plan(setup.num_agents, setup.day_steps)
+            actions = create_idle_action_plan(setup.num_agents, steps_today)
             plan_source = f"fallback_error: {e}"
 
         latency_ms = (time.perf_counter() - start_t) * 1000.0
