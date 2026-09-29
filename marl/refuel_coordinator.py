@@ -56,7 +56,8 @@ class RefuelCoordinator:
         for agent in sim_state.agents:
             if agent.kind == AgentKind.PATROL and agent.is_active:
                 ratio = agent.fuel / max(1, agent.max_fuel)
-                if ratio <= self.low_fuel_threshold:
+                # Only request refuel if fuel is genuinely low in absolute terms (<= 15) AND below threshold
+                if agent.fuel <= 15 and ratio <= self.low_fuel_threshold:
                     requests.append(
                         RefuelRequest(
                             patrol_agent_id=agent.agent_id,

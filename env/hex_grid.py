@@ -242,6 +242,31 @@ class HexGrid:
         steps, _ = self.get_movement_cost(from_index, to_index, AgentKind.PATROL)
         return steps
 
+    def update_traffics(self, traffics: Any) -> None:
+        """Update grid traffic levels from server state traffics data."""
+        if not traffics:
+            self.traffic_levels = [TrafficLevel.CLEAR.value] * self.num_cells
+            return
+
+        traffic_array = [TrafficLevel.CLEAR.value] * self.num_cells
+        if isinstance(traffics, list):
+            for idx, item in enumerate(traffics):
+                if isinstance(item, dict) and "pos" in item:
+                    p = item.get("pos", 0)
+                    if 0 <= p < self.num_cells:
+                        traffic_array[p] = item.get("status", 0)
+                elif isinstance(item, int) and idx < self.num_cells:
+                    traffic_array[idx] = item
+        elif isinstance(traffics, dict):
+            for p, st in traffics.items():
+                try:
+                    p_int = int(p)
+                    if 0 <= p_int < self.num_cells:
+                        traffic_array[p_int] = int(st)
+                except (ValueError, TypeError):
+                    pass
+        self.traffic_levels = traffic_array
+
     def format_agent_actions(
         self,
         start_pos: int,

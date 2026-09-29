@@ -175,6 +175,10 @@ class HybridMARLDPStrategy:
         elif not isinstance(day_steps, int) or day_steps <= 0:
             day_steps = 30
 
+        # Sync grid traffic levels from current simulation state
+        if hasattr(sim_state, "traffics") and sim_state.traffics is not None:
+            self.grid.update_traffics(sim_state.traffics)
+
         assigned_plans: Dict[int, List[int]] = {}
 
         # 0. Check Refueling coordination for low-fuel patrol agents
@@ -233,40 +237,75 @@ class HybridMARLDPStrategy:
             macro_task, _, _ = chosen_tasks[a_id]
             target_pos = macro_task.target_pos
 
-            # 3. Check standby or already at target
-            if macro_task.task_type == "STANDBY" or target_pos == agent.pos:
-                plan.append([-day_steps])
-                continue
+            # 3. Determine primary target spot (avoid sitting still on already-visited cell)
+            primary_target = target_pos
+            if macro_task.task_type == "STANDBY" or primary_target == agent.pos or not self.grid.is_passable(primary_target):
+                other_spots = [
+                    s.pos for s in sim_state.spots
+                    if s.pos != agent.pos and s.current_stock > 0 and self.grid.is_passable(s.pos)
+                ]
+                if other_spots:
+                    agent_coord = HexCoord.from_index(agent.pos, self.grid.width)
+                    other_spots.sort(key=lambda p: agent_coord.distance_to(HexCoord.from_index(p, self.grid.width)))
+                    primary_target = other_spots[0]
+                else:
+                    plan.append([-day_steps])
+                    continue
 
-            # Detect impossible target (impassable cell)
-            if not self.grid.is_passable(target_pos):
-                plan.append(self._fallback_plan(agent, sim_state, day_steps))
-                continue
-
-            # 4. Use precomputed policy or run DP for specific target
-            if target_pos in policy_maps:
-                policy = policy_maps[target_pos]
+            # 4. Extract route to primary target via DP or Dijkstra
+            route_actions: List[int] = []
+            if primary_target in policy_maps:
+                policy = policy_maps[primary_target]
             else:
-                policy, _, _ = self.dp_planner.plan([target_pos])
+                policy, _, _ = self.dp_planner.plan([primary_target])
 
-            # Extract route via DP
             path, actions, reached = self.dp_planner.extract_route(
                 start=agent.pos,
-                target_indices=[target_pos],
+                target_indices=[primary_target],
                 policy=policy,
                 max_steps=day_steps,
             )
 
-            # Check if DP succeeded
-            if not reached or not actions:
-                # Trigger Fallback 1: Dijkstra to nearest reachable target
-                plan.append(self._fallback_plan(agent, sim_state, day_steps))
-                continue
+            curr_chain_pos = agent.pos
+            if reached and actions:
+                route_actions = [a.value if hasattr(a, "value") else int(a) for a in actions]
+                curr_chain_pos = primary_target
+            else:
+                d_res = self.dijkstra_planner.plan(
+                    start_index=agent.pos,
+                    target_indices=primary_target,
+                    agent_kind=agent.kind,
+                    fuel_limit=agent.fuel,
+                )
+                if d_res.reachable and d_res.actions:
+                    route_actions = [a.value if hasattr(a, "value") else int(a) for a in d_res.actions]
+                    curr_chain_pos = d_res.path[-1]
+
+            # 5. Multi-spot chaining: continue visiting other spots with remaining steps
+            chain_visited = {agent.pos, curr_chain_pos}
+            while len(route_actions) < day_steps:
+                next_candidates = [
+                    s.pos for s in sim_state.spots
+                    if s.pos not in chain_visited and s.current_stock > 0 and self.grid.is_passable(s.pos)
+                ]
+                if not next_candidates:
+                    break
+                next_res = self.dijkstra_planner.plan(
+                    start_index=curr_chain_pos,
+                    target_indices=next_candidates,
+                    agent_kind=agent.kind,
+                    fuel_limit=agent.fuel,
+                )
+                if not next_res.reachable or not next_res.actions:
+                    break
+                route_actions.extend([a.value if hasattr(a, "value") else int(a) for a in next_res.actions])
+                curr_chain_pos = next_res.path[-1]
+                chain_visited.add(curr_chain_pos)
 
             # Format actions to respect movement step costs and fuel limits without overflowing
             agent_plan = self.grid.format_agent_actions(
                 start_pos=agent.pos,
-                actions=[a.value if hasattr(a, "value") else int(a) for a in actions],
+                actions=route_actions,
                 agent_kind=agent.kind,
                 day_steps=day_steps,
                 fuel=agent.fuel,
@@ -312,6 +351,9 @@ class IQLDijkstraStrategy:
 
     def plan_day(self, sim_state: SimulationState, day_steps: int) -> ActionPlan:
         """Plan day steps using IQL task allocation and Dijkstra path planning."""
+        if hasattr(sim_state, "traffics") and sim_state.traffics is not None:
+            self.grid.update_traffics(sim_state.traffics)
+
         chosen_tasks = self.marl_coordinator.select_macro_tasks(sim_state)
         plan: ActionPlan = []
 
@@ -324,24 +366,57 @@ class IQLDijkstraStrategy:
             macro_task, _, _ = chosen_tasks[a_id]
             target_pos = macro_task.target_pos
 
-            if macro_task.task_type == "STANDBY" or target_pos == agent.pos or not self.grid.is_passable(target_pos):
-                plan.append([-day_steps])
-                continue
+            primary_target = target_pos
+            if macro_task.task_type == "STANDBY" or primary_target == agent.pos or not self.grid.is_passable(primary_target):
+                other_spots = [
+                    s.pos for s in sim_state.spots
+                    if s.pos != agent.pos and s.current_stock > 0 and self.grid.is_passable(s.pos)
+                ]
+                if other_spots:
+                    agent_coord = HexCoord.from_index(agent.pos, self.grid.width)
+                    other_spots.sort(key=lambda p: agent_coord.distance_to(HexCoord.from_index(p, self.grid.width)))
+                    primary_target = other_spots[0]
+                else:
+                    plan.append([-day_steps])
+                    continue
 
             path_res = self.dijkstra_planner.plan(
                 start_index=agent.pos,
-                target_indices=target_pos,
+                target_indices=primary_target,
                 agent_kind=agent.kind,
                 fuel_limit=agent.fuel,
             )
 
-            if not path_res.reachable or not path_res.actions:
-                plan.append([-day_steps])
-                continue
+            route_actions: List[int] = []
+            curr_chain_pos = agent.pos
+            if path_res.reachable and path_res.actions:
+                route_actions = [a.value if hasattr(a, "value") else int(a) for a in path_res.actions]
+                curr_chain_pos = path_res.path[-1]
+
+            # Multi-spot chaining
+            chain_visited = {agent.pos, curr_chain_pos}
+            while len(route_actions) < day_steps:
+                next_candidates = [
+                    s.pos for s in sim_state.spots
+                    if s.pos not in chain_visited and s.current_stock > 0 and self.grid.is_passable(s.pos)
+                ]
+                if not next_candidates:
+                    break
+                next_res = self.dijkstra_planner.plan(
+                    start_index=curr_chain_pos,
+                    target_indices=next_candidates,
+                    agent_kind=agent.kind,
+                    fuel_limit=agent.fuel,
+                )
+                if not next_res.reachable or not next_res.actions:
+                    break
+                route_actions.extend([a.value if hasattr(a, "value") else int(a) for a in next_res.actions])
+                curr_chain_pos = next_res.path[-1]
+                chain_visited.add(curr_chain_pos)
 
             agent_plan = self.grid.format_agent_actions(
                 start_pos=agent.pos,
-                actions=[a.value if hasattr(a, "value") else int(a) for a in path_res.actions],
+                actions=route_actions,
                 agent_kind=agent.kind,
                 day_steps=day_steps,
                 fuel=agent.fuel,

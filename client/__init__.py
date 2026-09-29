@@ -16,7 +16,11 @@ from client.protocol import (
     create_idle_action_plan,
     validate_action_plan,
 )
-from client.runner import MatchRunner
+def __getattr__(name: str):
+    if name == "MatchRunner":
+        from client.runner import MatchRunner
+        return MatchRunner
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
     "ProconHttpClient",

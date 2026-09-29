@@ -58,7 +58,7 @@ class MatchRunner:
         strategy: Optional[Union[HybridMARLDPStrategy, Callable[[MatchSetup, MatchState], ActionPlan]]] = None,
         patrol_ratio: float = 0.67,
         max_days: int = 50,
-        poll_interval: float = 0.5,
+        poll_interval: float = 0.2,
         max_planning_time_ms: float = 900.0,  # Safety margin under 1000ms server limit
         log_dir: str = "logs/matches",
     ):
@@ -66,7 +66,7 @@ class MatchRunner:
         self.strategy = strategy
         self.patrol_ratio = patrol_ratio
         self.max_days = max_days
-        self.poll_interval = max(0.25, poll_interval)
+        self.poll_interval = max(0.15, poll_interval)
         self.max_planning_time_ms = max_planning_time_ms
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -218,6 +218,10 @@ class MatchRunner:
                 for a in state.agents
             ]
             logger.info(f"[Day {state.day}] Active agents: {len(state.agents)} | Status: {agents_summary}")
+
+            # Ensure strategy grid traffic levels are synced with current day's real-time state
+            if hasattr(self.strategy, "grid") and state.traffics is not None:
+                self.strategy.grid.update_traffics(state.traffics)
 
             # Generate actions with safety timer & fallback
             actions, latency_ms, plan_source = self._execute_strategy(setup, state)
