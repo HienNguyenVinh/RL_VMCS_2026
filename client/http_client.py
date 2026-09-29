@@ -185,11 +185,12 @@ class ProconHttpClient:
         return None
 
     def post_actions(
-        self, actions: ActionPlan, setup: Optional[MatchSetup] = None
+        self, actions: ActionPlan, setup: Optional[MatchSetup] = None, day: Optional[int] = None
     ) -> Dict[str, Any]:
         """Validate and submit plan of actions for all agents (POST /actions)."""
         if setup is not None:
-            validate_action_plan(actions, setup.num_agents, setup.day_steps)
+            steps_today = setup.get_steps_for_day(day if day is not None else 0)
+            validate_action_plan(actions, setup.num_agents, steps_today)
 
         logger.info(f"Submitting action plan for {len(actions)} agents")
         resp = self._request("POST", "/actions", json_body=actions)

@@ -232,7 +232,7 @@ class MatchRunner:
             # Submit actions
             server_resp = {}
             try:
-                server_resp = self.client.post_actions(actions, setup=setup)
+                server_resp = self.client.post_actions(actions, setup=setup, day=state.day)
                 is_valid = server_resp.get("valid", True)
                 if is_valid is False:
                     reason = server_resp.get("reason", "Server rejected plan")

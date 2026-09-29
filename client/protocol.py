@@ -182,7 +182,12 @@ def validate_action_plan(actions: ActionPlan, num_agents: int, day_steps: Any = 
             f"Action plan agent count mismatch: expected {num_agents} agents, got {len(actions)}"
         )
 
-    max_steps = day_steps if isinstance(day_steps, int) else 30
+    if isinstance(day_steps, list):
+        max_steps = max(day_steps) if day_steps else 30
+    elif isinstance(day_steps, int) and day_steps > 0:
+        max_steps = day_steps
+    else:
+        max_steps = 30
 
     for i, agent_plan in enumerate(actions):
         if not isinstance(agent_plan, list):
