@@ -47,22 +47,34 @@ class AgentState:
 class MatchSetup:
     """Initial match setup received from GET /setup."""
     match_id: str
-    day_steps: int
+    day_steps: Any
     width: int
     height: int
     num_agents: int
     fuel_limits: Dict[str, int] = field(default_factory=dict)
-    cells: List[Dict[str, Any]] = field(default_factory=list)
+    cells: Any = field(default_factory=list)
     spots: List[Dict[str, Any]] = field(default_factory=list)
     raw: Dict[str, Any] = field(default_factory=dict)
+
+    def get_steps_for_day(self, day: int) -> int:
+        """Return the step limit for a given day (handles both list and int daySteps)."""
+        if isinstance(self.day_steps, list):
+            if 0 <= day < len(self.day_steps):
+                return self.day_steps[day]
+            return 30
+        elif isinstance(self.day_steps, int) and self.day_steps > 0:
+            return self.day_steps
+        return 30
 
     @classmethod
     def from_dict(cls, match_id: str, data: Dict[str, Any]) -> "MatchSetup":
         map_info = data.get("map", {})
-        width = map_info.get("width", 0)
-        height = map_info.get("height", 0)
-        day_steps = data.get("daySteps", 0)
+        width = map_info.get("width", data.get("width", 0))
+        height = map_info.get("height", data.get("height", 0))
+        day_steps = data.get("daySteps", 30)
         agents = data.get("agents", [])
+        cells = map_info.get("cells", data.get("cells", []))
+        spots = data.get("spots", [])
         return cls(
             match_id=match_id,
             day_steps=day_steps,
@@ -70,8 +82,8 @@ class MatchSetup:
             height=height,
             num_agents=len(agents),
             fuel_limits=data.get("fuelLimits", {}),
-            cells=data.get("cells", []),
-            spots=data.get("spots", []),
+            cells=cells,
+            spots=spots,
             raw=data,
         )
 
@@ -82,7 +94,7 @@ class MatchState:
     day: int
     agents: List[AgentState] = field(default_factory=list)
     others: List[Dict[str, Any]] = field(default_factory=list)
-    traffics: List[int] = field(default_factory=list)
+    traffics: List[Any] = field(default_factory=list)
     raw: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -109,7 +121,7 @@ class MatchState:
         )
 
 
-ActionPlan = List[List[int]]  # List of action steps for each agent, e.g. [[0, 1, -1], [5, 4, -1]]
+ActionPlan = List[List[int]]  # List of action steps for each agent, e.g. [[0, 1, -20], [-30]]
 
 
 @dataclass
@@ -126,7 +138,7 @@ class MatchResult:
         return cls(
             match_id=match_id,
             winner=data.get("winner"),
-            scores=data.get("scores", data.get("teamScores", {})),
+            scores=data.get("scores", data.get("teamScores", data.get("standings", {}))),
             finished=data.get("finished", True),
             raw=data,
         )
@@ -152,8 +164,12 @@ class ProconMatchNotStartedError(ProconError):
     pass
 
 
-def validate_action_plan(actions: ActionPlan, num_agents: int, day_steps: int) -> None:
+def validate_action_plan(actions: ActionPlan, num_agents: int, day_steps: Any = 30) -> None:
     """Validate action plan format before submitting to server.
+    
+    Compatible with official BTC specification:
+    - Directions 0..5: Move in direction
+    - Negative integers -k: Stay still for k steps
     
     Raises:
         ValueError: If plan structure or direction values are invalid.
@@ -166,23 +182,28 @@ def validate_action_plan(actions: ActionPlan, num_agents: int, day_steps: int) -
             f"Action plan agent count mismatch: expected {num_agents} agents, got {len(actions)}"
         )
 
-    valid_directions = {-1, 0, 1, 2, 3, 4, 5}
+    max_steps = day_steps if isinstance(day_steps, int) else 30
+
     for i, agent_plan in enumerate(actions):
         if not isinstance(agent_plan, list):
             raise ValueError(f"Agent {i} plan must be a list, got {type(agent_plan)}")
 
-        if len(agent_plan) > day_steps:
+        if len(agent_plan) > max_steps:
             raise ValueError(
-                f"Agent {i} plan exceeds daySteps: {len(agent_plan)} > {day_steps}"
+                f"Agent {i} plan exceeds daySteps: {len(agent_plan)} > {max_steps}"
             )
 
         for step_idx, direction in enumerate(agent_plan):
-            if direction not in valid_directions:
+            if not isinstance(direction, int):
                 raise ValueError(
-                    f"Agent {i} step {step_idx} invalid direction: {direction}. Must be in {valid_directions}"
+                    f"Agent {i} step {step_idx} invalid action type: {type(direction)}"
+                )
+            if direction > 5:
+                raise ValueError(
+                    f"Agent {i} step {step_idx} invalid direction: {direction}. Direction must be <= 5"
                 )
 
 
 def create_idle_action_plan(num_agents: int, day_steps: int) -> ActionPlan:
-    """Create a smoke-test plan where all agents stay still for all steps."""
+    """Create a plan where all agents stay still for all steps."""
     return [[Direction.STAY.value] * day_steps for _ in range(num_agents)]

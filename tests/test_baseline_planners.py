@@ -40,9 +40,9 @@ class TestBaselinePathPlanners(unittest.TestCase):
             TerrainType.PLAIN.value,     # 0
             TerrainType.MOUNTAIN.value,  # 1
             TerrainType.PLAIN.value,     # 2 (Target)
-            TerrainType.ROAD.value,      # 3
+            TerrainType.PLAIN.value,     # 3
             TerrainType.ROAD.value,      # 4
-            TerrainType.PLAIN.value,     # 5
+            TerrainType.ROAD.value,      # 5
             TerrainType.PLAIN.value,     # 6
             TerrainType.PLAIN.value,     # 7
             TerrainType.PLAIN.value,     # 8
@@ -59,7 +59,7 @@ class TestBaselinePathPlanners(unittest.TestCase):
         # 1. Dijkstra verifies minimum cost path
         self.assertTrue(res_dijkstra.reachable)
         self.assertAlmostEqual(res_dijkstra.movement_cost, 4.0, places=2)
-        self.assertEqual(res_dijkstra.path, [0, 3, 4, 2])
+        self.assertEqual(res_dijkstra.path, [0, 4, 5, 2])
         self.assertEqual(res_dijkstra.route_length, 3)
         self.assertEqual(res_dijkstra.fuel_consumption, 5)
 

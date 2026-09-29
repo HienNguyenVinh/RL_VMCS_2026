@@ -178,6 +178,10 @@ class MatchRunner:
                 logger.warning(f"Error fetching state: {e}. Checking if match has concluded...")
                 break
 
+            if state is None:
+                time.sleep(self.poll_interval)
+                continue
+
             # Strictly prevent duplicate actions for same day
             if state.day <= self.last_acted_day:
                 logger.debug(f"[Day {state.day}] Already acted for this day. Polling...")

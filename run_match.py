@@ -188,6 +188,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
+        "pos_args",
+        nargs="*",
+        help="Tham số vị trí: [<MATCH_ID>] hoặc [<BASE_URL> <MATCH_ID> <TOKEN>]",
+    )
+    parser.add_argument(
         "-m", "--match",
         type=str,
         default=None,
@@ -204,6 +209,11 @@ def main():
         type=str,
         default=os.getenv("PROCON_BASE_URL", DEFAULT_BASE_URL),
         help=f"URL server PROCON (mặc định: {DEFAULT_BASE_URL})",
+    )
+    parser.add_argument(
+        "--btc",
+        action="store_true",
+        help="Sử dụng thuật toán BFS mẫu chuẩn của Ban Tổ Chức (btc_bot.py)",
     )
     parser.add_argument(
         "--mock",
@@ -224,12 +234,31 @@ def main():
 
     args = parser.parse_args()
 
+    # Xử lý tham số vị trí tương thích cú pháp BTC: python run_match.py <BASE> <MATCH> <TOKEN> hoặc <MATCH>
+    url = args.url
+    cli_match = args.match
+    cli_token = args.token
+
+    if args.pos_args:
+        if len(args.pos_args) >= 3:
+            url = args.pos_args[0]
+            cli_match = args.pos_args[1]
+            cli_token = args.pos_args[2]
+        elif len(args.pos_args) == 2:
+            cli_match = args.pos_args[0]
+            cli_token = args.pos_args[1]
+        elif len(args.pos_args) == 1:
+            if args.pos_args[0].startswith("http"):
+                url = args.pos_args[0]
+            else:
+                cli_match = args.pos_args[0]
+
     # Xác định match_id và chế độ chạy
     if args.mock:
-        match_id = args.match or "mock_match_001"
+        match_id = cli_match or "mock_match_001"
         use_mock = True
-    elif args.match:
-        match_id = args.match.strip()
+    elif cli_match:
+        match_id = cli_match.strip()
         use_mock = (match_id.lower() == "mock")
         if use_mock:
             match_id = "mock_match_001"
@@ -248,12 +277,20 @@ def main():
             match_id = user_input
             use_mock = False
 
-    token = resolve_token(match_id, args.token)
+    token = resolve_token(match_id, cli_token)
+
+    if args.btc and not use_mock:
+        # Chạy trực tiếp bot mẫu BTC
+        import subprocess
+        btc_script = Path(__file__).resolve().parent / "btc_bot.py"
+        print(f"[*] Khởi chạy bot mẫu BTC: {btc_script}")
+        subprocess.run([sys.executable, str(btc_script), url, match_id, token])
+        return
 
     play_match(
         match_id=match_id,
         token=token,
-        base_url=args.url,
+        base_url=url,
         use_mock=use_mock,
         open_browser=args.open_browser,
         poll_interval=args.poll,

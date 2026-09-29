@@ -111,17 +111,29 @@ class ProconHttpClient:
                 logger.error(f"Network error during {method} {url}: {e}")
                 raise
 
-    def get_setup(self) -> MatchSetup:
-        """Fetch match setup configuration (GET /setup)."""
+    def get_setup(self, max_wait_seconds: float = 120.0) -> MatchSetup:
+        """Fetch match setup configuration (GET /setup), retrying on HTTP 425 (map not open yet)."""
         logger.info(f"Fetching match setup: GET {self.api_prefix}/setup")
-        resp = self._request("GET", "/setup")
-        resp.raise_for_status()
-        data = resp.json()
-        setup = MatchSetup.from_dict(self.match_id, data)
-        logger.info(
-            f"Setup parsed: map={setup.width}x{setup.height}, agents={setup.num_agents}, daySteps={setup.day_steps}"
+        start_t = time.monotonic()
+        while time.monotonic() - start_t < max_wait_seconds:
+            resp = self._request("GET", "/setup")
+            if resp.status_code == 200:
+                data = resp.json()
+                setup = MatchSetup.from_dict(self.match_id, data)
+                logger.info(
+                    f"Setup parsed: map={setup.width}x{setup.height}, agents={setup.num_agents}, daySteps={setup.day_steps}"
+                )
+                return setup
+            elif resp.status_code == 425:
+                logger.info("Match setup not ready yet (HTTP 425: map not open), retrying in 200ms...")
+                time.sleep(0.2)
+                continue
+            else:
+                resp.raise_for_status()
+
+        raise ProconMatchNotStartedError(
+            f"Match setup for {self.match_id} timed out after {max_wait_seconds}s"
         )
-        return setup
 
     def post_assignment(self, assignment: List[int]) -> Dict[str, Any]:
         """Assign agent roles (POST /assignment).
@@ -144,13 +156,10 @@ class ProconHttpClient:
 
         while time.monotonic() - start_time < max_wait_seconds:
             resp = self._request("GET", "/start")
-
             if resp.status_code == 200:
                 logger.info("Match has officially started!")
                 return resp.json() if resp.text else {}
-            elif resp.status_code == 425:
-                # HTTP 425 Too Early: match has not started yet
-                logger.info("Match not ready yet (HTTP 425), waiting...")
+            elif resp.status_code in (425, 404):
                 time.sleep(poll_delay)
                 continue
             else:
@@ -160,13 +169,20 @@ class ProconHttpClient:
             f"Match {self.match_id} did not start within {max_wait_seconds} seconds."
         )
 
-    def get_state(self) -> MatchState:
-        """Fetch current match state for the day (GET /state)."""
+    def get_state(self) -> Optional[MatchState]:
+        """Fetch current match state for the day (GET /state). Returns None if 425/404."""
         resp = self._request("GET", "/state")
+        if resp.status_code == 200:
+            data = resp.json()
+            if data is not None:
+                state = MatchState.from_dict(data)
+                logger.debug(f"Fetched State: Day {state.day}, Active Agents: {len(state.agents)}")
+                return state
+            return None
+        elif resp.status_code in (425, 404):
+            return None
         resp.raise_for_status()
-        state = MatchState.from_dict(resp.json())
-        logger.debug(f"Fetched State: Day {state.day}, Active Agents: {len(state.agents)}")
-        return state
+        return None
 
     def post_actions(
         self, actions: ActionPlan, setup: Optional[MatchSetup] = None

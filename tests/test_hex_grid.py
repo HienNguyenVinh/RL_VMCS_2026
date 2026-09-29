@@ -25,14 +25,14 @@ class TestHexGridCoordinates(unittest.TestCase):
                 self.assertEqual(restored.col, c)
 
     def test_all_6_directions_even_row(self):
-        """Test all 6 directions from an interior even row cell (r=2, c=2)."""
+        """Test all 6 directions from an interior even row cell (r=2, c=2) matching BTC geometry."""
         r, c = 2, 2  # even row
         neighbors = {
-            Direction.UP_LEFT: (1, 1),
-            Direction.UP_RIGHT: (1, 2),
+            Direction.UP_LEFT: (1, 2),
+            Direction.UP_RIGHT: (1, 3),
             Direction.RIGHT: (2, 3),
-            Direction.DOWN_RIGHT: (3, 2),
-            Direction.DOWN_LEFT: (3, 1),
+            Direction.DOWN_RIGHT: (3, 3),
+            Direction.DOWN_LEFT: (3, 2),
             Direction.LEFT: (2, 1),
             Direction.STAY: (2, 2),
         }
@@ -42,14 +42,14 @@ class TestHexGridCoordinates(unittest.TestCase):
             self.assertEqual((nxt.row, nxt.col), expected, f"Failed for {direction.name} on even row")
 
     def test_all_6_directions_odd_row(self):
-        """Test all 6 directions from an interior odd row cell (r=3, c=2)."""
+        """Test all 6 directions from an interior odd row cell (r=3, c=2) matching BTC geometry."""
         r, c = 3, 2  # odd row
         neighbors = {
-            Direction.UP_LEFT: (2, 2),
-            Direction.UP_RIGHT: (2, 3),
+            Direction.UP_LEFT: (2, 1),
+            Direction.UP_RIGHT: (2, 2),
             Direction.RIGHT: (3, 3),
-            Direction.DOWN_RIGHT: (4, 3),
-            Direction.DOWN_LEFT: (4, 2),
+            Direction.DOWN_RIGHT: (4, 2),
+            Direction.DOWN_LEFT: (4, 1),
             Direction.LEFT: (3, 1),
             Direction.STAY: (3, 2),
         }
