@@ -202,17 +202,8 @@ class HybridMARLDPStrategy:
                         day_steps=day_steps,
                     )
                     if r_plan:
-                        meet_step = max(r_plan.patrol_arrival_step, r_plan.refuel_arrival_step)
-                        assigned_plans[patrol_agent.agent_id] = (
-                            r_plan.patrol_actions,
-                            r_plan.rendezvous_cell,
-                            meet_step,
-                        )
-                        assigned_plans[refuel_agent.agent_id] = (
-                            r_plan.refuel_actions,
-                            r_plan.rendezvous_cell,
-                            meet_step,
-                        )
+                        assigned_plans[patrol_agent.agent_id] = r_plan.patrol_actions
+                        assigned_plans[refuel_agent.agent_id] = r_plan.refuel_actions
                         refueler_idx += 1
 
         # 1. Compute DP cost-to-go maps for all active spots
@@ -265,52 +256,18 @@ class HybridMARLDPStrategy:
                 plan.append([-day_steps])
                 continue
 
-            # 2. If agent is already assigned to a refueling rendezvous
+            # 2. If agent is already assigned to a refueling rendezvous, format and execute plan
             if a_id in assigned_plans:
-                raw_actions, r_cell, meet_step = assigned_plans[a_id]
-                if agent.kind == AgentKind.REFUEL:
-                    plan.append(
-                        self.grid.format_agent_actions(
-                            start_pos=agent.pos,
-                            actions=raw_actions,
-                            agent_kind=agent.kind,
-                            day_steps=day_steps,
-                            fuel=agent.fuel,
-                        )
+                raw_plan = assigned_plans[a_id]
+                plan.append(
+                    self.grid.format_agent_actions(
+                        start_pos=agent.pos,
+                        actions=raw_plan,
+                        agent_kind=agent.kind,
+                        day_steps=day_steps,
+                        fuel=agent.fuel,
                     )
-                    continue
-
-                # Patrol agent: after rendezvous at r_cell, continue chaining to nearest active Udon spots
-                patrol_route = list(raw_actions[:meet_step])
-                curr_pos = r_cell
-                chain_visited = {agent.pos, curr_pos}
-                while len(patrol_route) < day_steps:
-                    next_candidates = [
-                        s.pos for s in sim_state.spots
-                        if s.pos not in chain_visited and s.current_stock > 0 and self.grid.is_passable(s.pos)
-                    ]
-                    if not next_candidates:
-                        break
-                    next_res = self.dijkstra_planner.plan(
-                        start_index=curr_pos,
-                        target_indices=next_candidates,
-                        agent_kind=AgentKind.PATROL,
-                        fuel_limit=agent.max_fuel,
-                    )
-                    if not next_res.reachable or not next_res.actions:
-                        break
-                    patrol_route.extend([a.value if hasattr(a, "value") else int(a) for a in next_res.actions])
-                    curr_pos = next_res.path[-1]
-                    chain_visited.add(curr_pos)
-
-                agent_plan = self.grid.format_agent_actions(
-                    start_pos=agent.pos,
-                    actions=patrol_route,
-                    agent_kind=agent.kind,
-                    day_steps=day_steps,
-                    fuel=agent.max_fuel,
                 )
-                plan.append(agent_plan)
                 continue
 
             macro_task, _, _ = chosen_tasks[a_id]

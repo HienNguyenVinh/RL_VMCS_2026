@@ -157,6 +157,8 @@ class RefuelCoordinator:
             t_p = p_res.route_length
             t_r = r_res.route_length
             max_t = max(t_p, t_r)
+            if max_t > day_steps:
+                continue
 
             # Score: minimize max arrival time, arrival discrepancy, and fuel spent by patrol
             score = max_t * 2.0 + abs(t_p - t_r) * 1.0 + p_res.fuel_consumption * 1.5
