@@ -106,22 +106,6 @@ class RefuelCoordinator:
             if self.grid.is_valid_index(mid_idx) and self.grid.is_passable(mid_idx):
                 candidates.add(mid_idx)
 
-            # Cells along patrol's path to active Udon spots
-            for spot in sim_state.spots:
-                if spot.current_stock > 0 and self.grid.is_passable(spot.pos):
-                    # Inspect 1-2 steps towards this spot
-                    path_to_spot = self.dijkstra.plan(
-                        patrol.pos, spot.pos, agent_kind=AgentKind.PATROL, fuel_limit=patrol.fuel
-                    )
-                    if path_to_spot.reachable and len(path_to_spot.path) > 1:
-                        mid_step = min(2, len(path_to_spot.path) - 1)
-                        candidates.add(path_to_spot.path[mid_step])
-
-            # Neighbors around patrol within 2 hexes
-            for d in Direction.all_movements():
-                n1 = self.grid.get_neighbor_index(patrol.pos, d)
-                if n1 is not None and self.grid.is_passable(n1):
-                    candidates.add(n1)
 
         best_cell = patrol.pos
         best_score = float("inf")

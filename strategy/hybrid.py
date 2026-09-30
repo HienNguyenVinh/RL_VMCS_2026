@@ -1,4 +1,5 @@
 """Hybrid MARL + DP Strategy and IQL+Dijkstra Strategy for PTIT PROCON 2026."""
+import heapq
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -16,7 +17,7 @@ from planner.value_iteration import ValueIteration
 class HybridMARLDPStrategy:
     """Hierarchical Strategy (Proposed Method):
     1. Multi-Agent RL (IQL) selects coordinated macro-tasks with conflict penalties.
-    2. Dynamic Programming (Value Iteration) computes optimal minimum-cost routes.
+    2. Dynamic Programming (Value Iteration / Dijkstra) computes optimal minimum-cost routes.
     3. Low-level execution validates fuel, detects impossible targets, and applies fallback.
     4. Refueling Coordinator handles low-fuel requests and rendezvous time synchronization.
     """
@@ -45,7 +46,6 @@ class HybridMARLDPStrategy:
         )
         self.last_assignments: Dict[int, int] = {}
 
-
         # Initialize IQL coordinator
         self.marl_coordinator = IndependentQLearning(
             num_agents=num_agents,
@@ -69,23 +69,49 @@ class HybridMARLDPStrategy:
     def compute_dp_cost_to_go(
         self, sim_state: SimulationState
     ) -> Tuple[Dict[int, Dict[int, float]], Dict[int, Dict[int, Direction]]]:
-        """Compute DP cost-to-go maps from all cells to each active candidate spot."""
+        """Compute DP cost-to-go and policy maps from all cells to each active candidate spot using fast Reverse Dijkstra."""
         cost_maps: Dict[int, Dict[int, float]] = {}
         policy_maps: Dict[int, Dict[int, Direction]] = {}
 
         for spot in sim_state.spots:
             if spot.current_stock > 0 and self.grid.is_passable(spot.pos):
-                policy, V, _ = self.dp_planner.plan([spot.pos])
-                policy_maps[spot.pos] = policy
-                # Derive cost-to-go: distance to target reward
-                target_val = 50.0
-                costs = {}
+                target = spot.pos
+                dist: Dict[int, float] = {target: 0.0}
+                pq: List[Tuple[float, int]] = [(0.0, target)]
+                while pq:
+                    d, u = heapq.heappop(pq)
+                    if d > dist[u]:
+                        continue
+                    for direct in Direction.all_movements():
+                        v = self.grid.get_neighbor_index(u, direct)
+                        if v is not None and self.grid.is_passable(v):
+                            cost, _ = self.grid.get_movement_cost(v, u, AgentKind.PATROL)
+                            if v not in dist or d + cost < dist[v]:
+                                dist[v] = d + cost
+                                heapq.heappush(pq, (d + cost, v))
+
+                policy: Dict[int, Direction] = {}
+                costs: Dict[int, float] = {}
                 for cell in range(self.grid.num_cells):
-                    if not self.grid.is_passable(cell):
+                    if not self.grid.is_passable(cell) or cell not in dist:
                         costs[cell] = 999.0
                     else:
-                        costs[cell] = max(0.0, target_val - float(V[cell]))
-                cost_maps[spot.pos] = costs
+                        costs[cell] = dist[cell]
+                        if cell != target:
+                            best_dir: Optional[Direction] = None
+                            best_c = float("inf")
+                            for direct in Direction.all_movements():
+                                nxt = self.grid.get_neighbor_index(cell, direct)
+                                if nxt is not None and self.grid.is_passable(nxt) and nxt in dist:
+                                    c, _ = self.grid.get_movement_cost(cell, nxt, AgentKind.PATROL)
+                                    if c + dist[nxt] < best_c:
+                                        best_c = c + dist[nxt]
+                                        best_dir = direct
+                            if best_dir is not None:
+                                policy[cell] = best_dir
+
+                cost_maps[target] = costs
+                policy_maps[target] = policy
 
         return cost_maps, policy_maps
 
