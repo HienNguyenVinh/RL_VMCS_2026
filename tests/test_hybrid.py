@@ -6,10 +6,15 @@ from env.hex_grid import HexGrid, TerrainType
 from env.simulator import HexGridSimulator
 from marl.state_encoder import StateEncoder
 from marl.task_allocator import TaskAllocator
-from strategy.dp_only import DPOnlyStrategy
-from strategy.greedy import GreedyDPStrategy, GreedyDijkstraStrategy, GreedyStrategy
-from strategy.hybrid import HybridMARLDPStrategy, IQLDijkstraStrategy
-from strategy.random import RandomStrategy
+from strategy import (
+    DPOnlyStrategy,
+    GreedyDPStrategy,
+    GreedyDijkstraStrategy,
+    GreedyStrategy,
+    HybridMARLDPStrategy,
+    IQLDijkstraStrategy,
+    RandomStrategy,
+)
 
 
 class TestHybridStrategy(unittest.TestCase):

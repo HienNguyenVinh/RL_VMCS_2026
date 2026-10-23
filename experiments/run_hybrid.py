@@ -16,10 +16,15 @@ import numpy as np
 
 from env.simulator import HexGridSimulator
 from experiments.experiment_logger import ExperimentLogger
-from strategy.dp_only import DPOnlyStrategy
-from strategy.greedy import GreedyDPStrategy, GreedyDijkstraStrategy, GreedyStrategy
-from strategy.hybrid import HybridMARLDPStrategy, IQLDijkstraStrategy
-from strategy.random import RandomStrategy
+from strategy import (
+    DPOnlyStrategy,
+    GreedyDPStrategy,
+    GreedyDijkstraStrategy,
+    GreedyStrategy,
+    HybridMARLDPStrategy,
+    IQLDijkstraStrategy,
+    RandomStrategy,
+)
 
 
 def run_strategy_trial(

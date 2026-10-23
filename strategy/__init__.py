@@ -1,8 +1,13 @@
 """Strategy package for PROCON DP-MARL."""
-from strategy.dp_only import DPOnlyStrategy
-from strategy.greedy import GreedyDPStrategy, GreedyDijkstraStrategy, GreedyStrategy
-from strategy.hybrid import HybridMARLDPStrategy, IQLDijkstraStrategy
-from strategy.random import RandomStrategy
+from strategy.baselines import (
+    DPOnlyStrategy,
+    GreedyDPStrategy,
+    GreedyDijkstraStrategy,
+    GreedyStrategy,
+    IQLDijkstraStrategy,
+    RandomStrategy,
+)
+from strategy.hybrid import HybridMARLDPStrategy
 
 __all__ = [
     "RandomStrategy",

@@ -74,26 +74,32 @@ procon/
 │   ├── __init__.py
 │   ├── policy_evaluation.py           # Iterative Policy Evaluation
 │   ├── policy_iteration.py            # Policy Iteration
-│   └── value_iteration.py             # Value Iteration
+│   ├── value_iteration.py             # Vectorized Bellman Value Iteration
+│   ├── dijkstra.py                    # Dijkstra Route Planner
+│   └── bfs.py                         # Breadth-First Search Baseline
 │
 ├── marl/                              # Tầng học tăng cường đa tác nhân (Multi-Agent RL)
 │   ├── __init__.py
 │   ├── q_agent.py                     # Tabular Q-Learning Agent (epsilon-greedy)
 │   ├── iql.py                         # Independent Q-Learning coordinator
 │   ├── task_allocator.py              # Bộ phân công nhiệm vụ vĩ mô
-│   └── state_encoder.py               # Discretize không gian trạng thái cho tabular Q
+│   ├── state_encoder.py               # Discretize không gian trạng thái cho tabular Q
+│   └── refuel_coordinator.py          # Bộ điều phối tiếp nhiên liệu & điểm hẹn
 │
 ├── strategy/                          # Các chiến lược điều khiển
 │   ├── __init__.py
-│   ├── greedy.py                      # Baseline tham lam (chọn đích gần nhất)
-│   ├── dp_only.py                     # Chiến lược thuần DP
-│   └── hybrid.py                      # Chiến lược phân cấp kết hợp MARL + DP
+│   ├── baselines.py                   # Tập hợp chiến lược baseline & ablation (Random, Greedy, Greedy-DP, DP-Only, IQL-Dijkstra)
+│   └── hybrid.py                      # Chiến lược phân cấp đề xuất: MARL (IQL) + DP (Value Iteration) + Refuel Coordination
 │
 ├── experiments/                       # Thí nghiệm & benchmark
 │   ├── __init__.py
 │   ├── run_dp.py                      # So sánh Value Iteration vs Policy Iteration
+│   ├── run_single_agent_rl.py         # Thí nghiệm Single Agent Q-Learning
 │   ├── run_marl.py                    # Thí nghiệm train Independent Q-Learning offline
 │   ├── run_hybrid.py                  # Benchmark chiến lược Hybrid so với Baseline
+│   ├── run_tournament.py              # Đấu giải nhiều ngày và đánh giá tiếp nhiên liệu
+│   ├── run_baseline_comparison.py     # Đo hiệu năng BFS vs Dijkstra
+│   ├── run_real_server_test.py        # Kiểm thử tích hợp tự động hóa trận đấu
 │   ├── experiment_logger.py           # Ghi nhận log thí nghiệm vào CSV & JSON
 │   ├── experiment_log.md              # Bảng theo dõi kết quả thí nghiệm
 │   └── configs/                       # Cấu hình các kịch bản sweep
@@ -104,14 +110,19 @@ procon/
 ├── plots/                             # Thư mục lưu biểu đồ kết quả
 │   └── .gitkeep
 │
-├── tests/                             # Unit tests
+├── tests/                             # Unit tests (47 tests)
 │   ├── __init__.py
 │   ├── test_hex_grid.py               # Kiểm tra chuyển đổi tọa độ và láng giềng hex
 │   ├── test_dp.py                     # Kiểm tra sự hội tụ của Value/Policy Iteration
 │   ├── test_qlearning.py              # Kiểm tra Bellman update và epsilon decay
-│   └── test_connection.py            # Kiểm tra URL client và parse protocol
+│   ├── test_baseline_planners.py      # Kiểm tra thuật toán BFS và Dijkstra
+│   ├── test_hybrid.py                 # Kiểm tra chiến lược phân cấp Hybrid MARL+DP
+│   ├── test_refuel.py                 # Kiểm tra điều phối tiếp nhiên liệu & điểm hẹn
+│   ├── test_connection.py            # Kiểm tra URL client và parse protocol
+│   └── test_real_server.py            # Kiểm tra khả năng chịu lỗi và phản hồi server
 │
-└── main.py                            # Điểm khởi chạy chính của hệ thống
+├── main.py                            # Điểm khởi chạy chính cho demo, thí nghiệm và benchmark
+└── run_match.py                       # Trình thực thi thi đấu và đồng bộ trực tiếp (Live Server / Mock Server)
 ```
 
 ---

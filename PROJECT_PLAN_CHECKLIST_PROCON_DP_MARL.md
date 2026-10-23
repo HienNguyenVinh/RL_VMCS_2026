@@ -1377,7 +1377,7 @@ Nếu bắt đầu project ngay bây giờ:
 - [ ] **Task 15:** chạy baseline experiments.
 - [ ] **Task 16:** chạy nhiều seed.
 - [ ] **Task 17:** tổng hợp plot + table.
-- [ ] **Task 18:** viết report.
+- [x] **Task 18:** viết report (Đã hoàn thiện tại [REPORT_PROCON_DP_MARL.md](file:///d:/PythonProject/procon/REPORT_PROCON_DP_MARL.md)).
 - [ ] **Task 19:** làm slide.
 - [ ] **Task 20:** rehearsal demo.
 

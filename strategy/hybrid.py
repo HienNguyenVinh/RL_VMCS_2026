@@ -1,5 +1,4 @@
 """Hybrid MARL + DP Strategy and IQL+Dijkstra Strategy for PTIT PROCON 2026."""
-import heapq
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -17,7 +16,7 @@ from planner.value_iteration import ValueIteration
 class HybridMARLDPStrategy:
     """Hierarchical Strategy (Proposed Method):
     1. Multi-Agent RL (IQL) selects coordinated macro-tasks with conflict penalties.
-    2. Dynamic Programming (Value Iteration / Dijkstra) computes optimal minimum-cost routes.
+    2. Dynamic Programming (Value Iteration) computes optimal minimum-cost routes.
     3. Low-level execution validates fuel, detects impossible targets, and applies fallback.
     4. Refueling Coordinator handles low-fuel requests and rendezvous time synchronization.
     """
@@ -69,49 +68,23 @@ class HybridMARLDPStrategy:
     def compute_dp_cost_to_go(
         self, sim_state: SimulationState
     ) -> Tuple[Dict[int, Dict[int, float]], Dict[int, Dict[int, Direction]]]:
-        """Compute DP cost-to-go and policy maps from all cells to each active candidate spot using fast Reverse Dijkstra."""
+        """Compute DP cost-to-go and policy maps from all cells to each active candidate spot using Value Iteration."""
         cost_maps: Dict[int, Dict[int, float]] = {}
         policy_maps: Dict[int, Dict[int, Direction]] = {}
 
+        target_val = 50.0
         for spot in sim_state.spots:
             if spot.current_stock > 0 and self.grid.is_passable(spot.pos):
-                target = spot.pos
-                dist: Dict[int, float] = {target: 0.0}
-                pq: List[Tuple[float, int]] = [(0.0, target)]
-                while pq:
-                    d, u = heapq.heappop(pq)
-                    if d > dist[u]:
-                        continue
-                    for direct in Direction.all_movements():
-                        v = self.grid.get_neighbor_index(u, direct)
-                        if v is not None and self.grid.is_passable(v):
-                            cost, _ = self.grid.get_movement_cost(v, u, AgentKind.PATROL)
-                            if v not in dist or d + cost < dist[v]:
-                                dist[v] = d + cost
-                                heapq.heappush(pq, (d + cost, v))
+                policy, V, _ = self.dp_planner.plan([spot.pos])
+                policy_maps[spot.pos] = policy
 
-                policy: Dict[int, Direction] = {}
                 costs: Dict[int, float] = {}
                 for cell in range(self.grid.num_cells):
-                    if not self.grid.is_passable(cell) or cell not in dist:
+                    if not self.grid.is_passable(cell):
                         costs[cell] = 999.0
                     else:
-                        costs[cell] = dist[cell]
-                        if cell != target:
-                            best_dir: Optional[Direction] = None
-                            best_c = float("inf")
-                            for direct in Direction.all_movements():
-                                nxt = self.grid.get_neighbor_index(cell, direct)
-                                if nxt is not None and self.grid.is_passable(nxt) and nxt in dist:
-                                    c, _ = self.grid.get_movement_cost(cell, nxt, AgentKind.PATROL)
-                                    if c + dist[nxt] < best_c:
-                                        best_c = c + dist[nxt]
-                                        best_dir = direct
-                            if best_dir is not None:
-                                policy[cell] = best_dir
-
-                cost_maps[target] = costs
-                policy_maps[target] = policy
+                        costs[cell] = max(0.0, target_val - float(V[cell]))
+                cost_maps[spot.pos] = costs
 
         return cost_maps, policy_maps
 
@@ -384,111 +357,7 @@ class HybridMARLDPStrategy:
         return plan
 
 
-class IQLDijkstraStrategy:
-    """Baseline B3: MARL (IQL) task allocation + Dijkstra minimum-cost path planning."""
 
-    def __init__(
-        self,
-        grid: HexGrid,
-        num_agents: int = 3,
-        weights_dir: Optional[Union[str, Path]] = "experiments/models/marl",
-        evaluation_mode: bool = True,
-    ):
-        self.grid = grid
-        self.num_agents = num_agents
-        self.encoder = StateEncoder()
-        self.allocator = TaskAllocator()
-        self.dijkstra_planner = DijkstraPlanner(grid)
-        self.last_assignments: Dict[int, int] = {}
+# Alias for backwards compatibility (full baseline implementation in strategy/baselines.py)
+from strategy.baselines import IQLDijkstraStrategy
 
-        self.marl_coordinator = IndependentQLearning(
-            num_agents=num_agents,
-            conflict_penalty=-15.0,
-            shared_weight=0.5,
-        )
-
-        if weights_dir is not None:
-            w_path = Path(weights_dir)
-            if w_path.exists():
-                self.marl_coordinator.load(w_path)
-
-        if evaluation_mode:
-            for q_agent in self.marl_coordinator.agents.values():
-                q_agent.epsilon = 0.0
-
-    def plan_day(self, sim_state: SimulationState, day_steps: int) -> ActionPlan:
-        """Plan day steps using IQL task allocation and Dijkstra path planning."""
-        if hasattr(sim_state, "traffics") and sim_state.traffics is not None:
-            self.grid.update_traffics(sim_state.traffics)
-
-        chosen_tasks = self.marl_coordinator.select_macro_tasks(sim_state)
-        plan: ActionPlan = []
-
-        for agent in sim_state.agents:
-            a_id = agent.agent_id
-            if agent.kind == AgentKind.REFUEL:
-                plan.append([-day_steps])
-                continue
-
-            macro_task, _, _ = chosen_tasks[a_id]
-            target_pos = macro_task.target_pos
-
-            primary_target = target_pos
-            if macro_task.task_type == "STANDBY" or primary_target == agent.pos or not self.grid.is_passable(primary_target):
-                other_spots = [
-                    s.pos for s in sim_state.spots
-                    if s.pos != agent.pos and s.current_stock > 0 and self.grid.is_passable(s.pos)
-                ]
-                if other_spots:
-                    agent_coord = HexCoord.from_index(agent.pos, self.grid.width)
-                    other_spots.sort(key=lambda p: agent_coord.distance_to(HexCoord.from_index(p, self.grid.width)))
-                    primary_target = other_spots[0]
-                else:
-                    plan.append([-day_steps])
-                    continue
-
-            path_res = self.dijkstra_planner.plan(
-                start_index=agent.pos,
-                target_indices=primary_target,
-                agent_kind=agent.kind,
-                fuel_limit=agent.fuel,
-            )
-
-            route_actions: List[int] = []
-            curr_chain_pos = agent.pos
-            if path_res.reachable and path_res.actions:
-                route_actions = [a.value if hasattr(a, "value") else int(a) for a in path_res.actions]
-                curr_chain_pos = path_res.path[-1]
-
-            # Multi-spot chaining
-            chain_visited = {agent.pos, curr_chain_pos}
-            while len(route_actions) < day_steps:
-                next_candidates = [
-                    s.pos for s in sim_state.spots
-                    if s.pos not in chain_visited and s.current_stock > 0 and self.grid.is_passable(s.pos)
-                ]
-                if not next_candidates:
-                    break
-                next_res = self.dijkstra_planner.plan(
-                    start_index=curr_chain_pos,
-                    target_indices=next_candidates,
-                    agent_kind=agent.kind,
-                    fuel_limit=agent.fuel,
-                )
-                if not next_res.reachable or not next_res.actions:
-                    break
-                route_actions.extend([a.value if hasattr(a, "value") else int(a) for a in next_res.actions])
-                curr_chain_pos = next_res.path[-1]
-                chain_visited.add(curr_chain_pos)
-
-            agent_plan = self.grid.format_agent_actions(
-                start_pos=agent.pos,
-                actions=route_actions,
-                agent_kind=agent.kind,
-                day_steps=day_steps,
-                fuel=agent.fuel,
-            )
-            plan.append(agent_plan)
-
-        validate_action_plan(plan, len(sim_state.agents), day_steps)
-        return plan
