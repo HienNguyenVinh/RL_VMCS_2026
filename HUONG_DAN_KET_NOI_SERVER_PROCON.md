@@ -1,264 +1,252 @@
-# Hướng dẫn kết nối server và xem trận đấu — PTIT PROCON 2026
+# PROCON Server Connection & Match Monitoring Guide — PTIT PROCON 2026
 
-Tài liệu này hướng dẫn cách:
+This guide provides step-by-step instructions for:
 
-1. Lấy **API token** của đội.
-2. Tạo hoặc tìm một trận để test.
-3. Kết nối bot với server bằng **HTTP polling**.
-4. Kết nối bằng **WebSocket**.
-5. Gửi loại tác nhân và kế hoạch di chuyển.
-6. Theo dõi / xem trận đấu của đội trên giao diện web.
-7. Xử lý một số lỗi kết nối thường gặp.
+1. Logging in with official team credentials.
+2. Retrieving your team's **API token**.
+3. Creating or joining test matches.
+4. Connecting your bot via **HTTP Polling** or **WebSocket**.
+5. Dispatching agent role assignments and multi-step action plans.
+6. Monitoring live match telemetry on the official web dashboard.
+7. Diagnosing and resolving common network, protocol, and rate-limit errors.
 
-> Base URL theo tài liệu của PROCON:
->
+> **Official Server Base URL:**  
 > `https://procon.ptit.edu.vn`
 
 ---
 
-## 1. Các thông tin cần có
+## 1. Team Authentication & Web Login
 
-Bot cần tối thiểu:
+To access match configurations, tokens, and live visualizers, log into the official PTIT PROCON competition platform:
+
+### Team Credentials
+| Field | Value | Notes |
+|---|---|---|
+| **Portal URL** | `https://procon.ptit.edu.vn` | Official competition web server |
+| **Username** | `team022` | Official team account ID |
+| **Password** | `11aaAA@@` | Team login password |
+
+### Login Steps:
+1. Navigate to `https://procon.ptit.edu.vn` in your browser.
+2. Click **Đăng nhập** (Sign In) in the upper navigation bar.
+3. Enter username: `team022` and password: `11aaAA@@`.
+4. Upon successful login, you will gain access to **Trận của tôi** (My Matches) and the API Token management console.
+
+---
+
+## 2. Required Connection Parameters
+
+At minimum, your bot requires the following 3 variables:
 
 ```text
 BASE_URL = https://procon.ptit.edu.vn
-MATCH_ID = ID của trận đấu
-TOKEN    = API token của đội
+MATCH_ID = <Match Identifier, e.g. m-32744>
+TOKEN    = <Team API Bearer Token>
 ```
 
-Không ghi token thật trực tiếp vào source code nếu source được đưa lên Git/GitHub.
+> [!CAUTION]
+> **Never commit your actual token directly to source control (Git/GitHub).**  
+> Always supply credentials using environment variables or a local `.env` file (which is excluded by `.gitignore`).
 
-Nên sử dụng biến môi trường:
+### Setting Environment Variables
 
+#### Local `.env` file (Recommended):
+Copy `.env.example` to `.env`:
+```env
+PROCON_BASE_URL=https://procon.ptit.edu.vn
+PROCON_MATCH_ID=m-32744
+PROCON_TOKEN=bot-your_bearer_token_here
+```
+
+#### Linux / macOS Bash:
 ```bash
-export PROCON_TOKEN="your_token_here"
-export PROCON_MATCH_ID="your_match_id_here"
+export PROCON_BASE_URL="https://procon.ptit.edu.vn"
+export PROCON_MATCH_ID="m-32744"
+export PROCON_TOKEN="bot-your_bearer_token_here"
 ```
 
-Windows PowerShell:
-
+#### Windows PowerShell:
 ```powershell
-$env:PROCON_TOKEN="your_token_here"
-$env:PROCON_MATCH_ID="your_match_id_here"
+$env:PROCON_BASE_URL="https://procon.ptit.edu.vn"
+$env:PROCON_MATCH_ID="m-32744"
+$env:PROCON_TOKEN="bot-your_bearer_token_here"
 ```
 
 ---
 
-# 2. Lấy API token của đội
+## 3. Retrieving Your Team's API Token
 
-Trên trang PTIT PROCON:
+On the PTIT PROCON web portal:
 
-1. Đăng nhập tài khoản của đội.
-2. Mở tab **Trận của tôi**.
-3. Kéo xuống mục **Token API của đội (dùng chung mọi trận)**.
-4. Chọn một token đã có hoặc tạo token mới.
-5. Sao chép token và lưu lại để bot sử dụng.
+1. Log into your account (`team022`).
+2. Open the **Trận của tôi** (My Matches) tab.
+3. Scroll down to **Token API của đội (dùng chung mọi trận)** (Team API Tokens).
+4. Copy an existing token or click **Tạo token mới** (Generate New Token).
+5. Store the token securely in your local `.env` file.
 
-Server sử dụng token theo HTTP header:
-
+The server expects this token in the HTTP Authorization header:
 ```http
 Authorization: Bearer <token>
 ```
 
-Ví dụ:
-
+Example:
 ```http
-Authorization: Bearer bot-xxxxxxxxxxxxxxxx
+Authorization: Bearer bot-34d7632cb475ab0680eac8
 ```
 
-> Một đội có thể tạo nhiều token, ví dụ mỗi máy hoặc mỗi bot dùng một token riêng và có thể thu hồi riêng khi cần.
+> [!TIP]
+> A team can generate multiple unique tokens (e.g., dedicated tokens for different testing machines or development branches) and revoke old tokens independently if compromised.
 
 ---
 
-# 3. Tạo một trận để test
+## 4. Creating a Test Match
 
-Trong tab **Trận của tôi**, có ba cách phù hợp để test bot.
+Within the **Trận của tôi** (My Matches) tab, three match types are available:
 
-## Cách A — Kiểm tra bot trước trận
-
-Chọn:
-
+### Option A — Pre-Match Bot Verification (Kiểm tra bot trước trận)
+Select:
 **Kiểm tra bot trước trận → Bắt đầu kiểm tra**
 
-Mục đích là chạy một trận nháp nhỏ với thời gian phản hồi giống trận thật để kiểm tra:
+This launches a lightweight test match with production timing constraints to verify:
+- API token validity
+- HTTP endpoint protocol compliance
+- Decision latency (< 1000 ms)
+- JSON request and action formatting
 
-- token;
-- giao thức API;
-- tốc độ bot;
-- format request/response.
-
-Đây là lựa chọn nên dùng đầu tiên khi mới viết bot.
-
----
-
-## Cách B — Luyện tập với máy
-
-Trong phần **Luyện tập với máy**:
-
-1. Chọn độ khó.
-2. Chọn số bot đối thủ.
-3. Chọn số ngày.
-4. Chọn cỡ bản đồ.
-5. Nếu cần, mở phần **Nâng cao** để chỉnh:
-   - bước/ngày;
-   - thời gian phản hồi;
-   - số xe/đội;
-   - số quán udon;
-   - số chuỗi udon;
-   - mức nhiên liệu.
-6. Nhấn **Tạo trận luyện tập**.
-
-Sau khi tạo, trận sẽ xuất hiện trong danh sách trận của đội.
+*This is the recommended first step whenever testing new code.*
 
 ---
 
-## Cách C — Đấu với đội khác
+### Option B — Practice Match Against AI (Luyện tập với máy)
+Under **Luyện tập với máy**:
+1. Select difficulty level.
+2. Select number of opponent bots.
+3. Set match duration (number of days).
+4. Choose map size (e.g., 8×8, 10×10, 16×16).
+5. Open **Nâng cao** (Advanced Settings) to adjust:
+   - Steps per day (`daySteps`)
+   - Turn response timeout (ms)
+   - Agents per team
+   - Fuel limit & starting conditions
+6. Click **Tạo trận luyện tập** (Create Practice Match).
 
-Chọn:
-
-**Tìm đối thủ thật**
-
-Sau khi ghép thành công, cả hai đội sẽ thấy trận trong danh sách bên dưới của trang **Trận của tôi**.
+The generated match ID (e.g., `m-32743`) will immediately appear in your match list.
 
 ---
 
-# 4. Xem trận đấu của mình trên website
+### Option C — Matchmaking Against Another Team (Tìm đối thủ thật)
+Select:
+**Tìm đối thủ thật** (Find Real Opponent)
 
-Cách đơn giản nhất để theo dõi trận:
+Once matchmaking succeeds, the match will appear in the active match list for both teams.
 
-1. Mở `https://procon.ptit.edu.vn`.
-2. Đăng nhập.
-3. Chọn tab **Trận của tôi**.
-4. Tìm trận vừa tạo hoặc vừa được ghép.
-5. Chọn trận trong danh sách để mở giao diện theo dõi trận.
-6. Trong lúc bot đang chạy, có thể giữ trang trận mở để quan sát trạng thái theo từng ngày.
-7. Khi trận kết thúc, xem kết quả của trận tại cùng khu vực trận đấu.
+---
 
-Nếu đang debug bot, nên mở đồng thời:
+## 5. Live Match Visualizer
+
+To observe your bot in real time:
+
+1. Open `https://procon.ptit.edu.vn` and log in with `team022`.
+2. Navigate to **Trận của tôi** (My Matches).
+3. Find your active match by ID and click to open the visualizer interface.
+4. Keep the browser page open while your bot runs in the terminal to observe:
+   - Agent positions on the hex grid
+   - Fuel gauge levels
+   - Collected Udon spot scores
+   - Traffic density changes
+5. When the match concludes, final scores and game replays are displayed directly on that page.
 
 ```text
-Terminal chạy bot
-        +
-Trình duyệt mở trận đấu
++-----------------------+           +-----------------------------+
+|   Terminal running    | <=======> |   Browser with live visual  |
+|   run_match.py / main |           |   https://procon.ptit.edu.vn|
++-----------------------+           +-----------------------------+
 ```
 
-để đối chiếu action bot gửi lên với trạng thái hiển thị trên server.
-
 ---
 
-# 5. Hai cách kết nối bot
+## 6. Communication Protocols: HTTP Polling vs. WebSocket
 
-PROCON cung cấp hai cách kết nối:
-
-| Cách | Endpoint | Đặc điểm |
+| Protocol | Base URL / Path | Characteristics |
 |---|---|---|
-| HTTP polling | `/api/v1/matches/{id}/...` | Đơn giản nhất, chủ động gọi API |
-| WebSocket | `/ws/v1/matches/{id}?token=...` | Server đẩy state, bot giữ kết nối |
-
-Khi mới triển khai, nên bắt đầu bằng **HTTP polling**.
+| **HTTP Polling** | `/api/v1/matches/{id}/...` | Simple request-response loop; easiest to debug; recommended |
+| **WebSocket** | `/ws/v1/matches/{id}?token=...` | Persistent bi-directional socket; server pushes turn states |
 
 ---
 
-# 6. HTTP polling
+## 7. HTTP Polling Protocol Specification
 
-Base API của một trận:
-
+Base API path for a match:
 ```text
 https://procon.ptit.edu.vn/api/v1/matches/{MATCH_ID}
 ```
 
-Header:
-
+Required Headers:
 ```http
 Authorization: Bearer <TOKEN>
 Content-Type: application/json
 ```
 
-Các endpoint theo tài liệu:
-
-| Thao tác | Method | Endpoint |
-|---|---:|---|
-| Lấy cấu hình | GET | `/api/v1/matches/{id}/setup` |
-| Gán loại tác nhân | POST | `/api/v1/matches/{id}/assignment` |
-| Chờ bắt đầu | GET | `/api/v1/matches/{id}/start` |
-| Lấy state ngày | GET | `/api/v1/matches/{id}/state` |
-| Gửi hành động | POST | `/api/v1/matches/{id}/actions` |
-| Lấy kết quả | GET | `/api/v1/matches/{id}/result` |
+### Endpoints Lifecycle:
+| Step | Action | Method | Endpoint | Description |
+|---|---|:---:|---|---|
+| 1 | Fetch Setup | `GET` | `/setup` | Map dimensions, terrain, obstacles, fuel limits |
+| 2 | Role Assignment | `POST` | `/assignment` | Assign agent roles (Patrol vs. Refuel) |
+| 3 | Await Start | `GET` | `/start` | Poll until match begins (handles `HTTP 425`) |
+| 4 | Fetch Day State | `GET` | `/state` | Agent coordinates, current fuel, spots, traffic |
+| 5 | Submit Actions | `POST` | `/actions` | Daily movement and standby plan for all agents |
+| 6 | Retrieve Results| `GET` | `/result` | Final scores, winner, and telemetry statistics |
 
 ---
 
-# 7. Test kết nối nhanh bằng curl
+## 8. Quick Connectivity Check with `curl`
 
-Đặt:
-
+Define environment variables:
 ```bash
 BASE="https://procon.ptit.edu.vn"
-MATCH_ID="your_match_id"
-TOKEN="your_token"
+MATCH_ID="m-32744"
+TOKEN="your_token_here"
 ```
 
-## Lấy setup
-
+### Fetch Match Setup:
 ```bash
-curl \
-  -H "Authorization: Bearer $TOKEN" \
-  "$BASE/api/v1/matches/$MATCH_ID/setup"
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/matches/$MATCH_ID/setup"
 ```
 
-Nếu token và `MATCH_ID` đúng, server sẽ trả về JSON cấu hình trận.
-
----
-
-## Lấy state hiện tại
-
+### Fetch Daily State:
 ```bash
-curl \
-  -H "Authorization: Bearer $TOKEN" \
-  "$BASE/api/v1/matches/$MATCH_ID/state"
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/matches/$MATCH_ID/state"
+```
+
+### Fetch Final Result:
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/matches/$MATCH_ID/result"
 ```
 
 ---
 
-## Lấy kết quả
+## 9. Minimal Python Client
 
-```bash
-curl \
-  -H "Authorization: Bearer $TOKEN" \
-  "$BASE/api/v1/matches/$MATCH_ID/result"
-```
-
----
-
-# 8. Python client tối thiểu
-
-Có thể bắt đầu bằng thư viện chuẩn của Python, không cần cài `requests`.
-
-Tạo file:
-
-```text
-connection_test.py
-```
+You can test connectivity using standard Python libraries without third-party dependencies:
 
 ```python
+"""connection_test.py — Minimal PROCON connectivity smoke script."""
 import json
 import os
 import urllib.request
 import urllib.error
 
-BASE = "https://procon.ptit.edu.vn"
+BASE = os.getenv("PROCON_BASE_URL", "https://procon.ptit.edu.vn")
 MATCH_ID = os.environ["PROCON_MATCH_ID"]
 TOKEN = os.environ["PROCON_TOKEN"]
 
 API = f"{BASE}/api/v1/matches/{MATCH_ID}"
 
 
-def call(method, path, body=None):
-    data = None
+def call(method: str, path: str, body: dict = None):
+    data = json.dumps(body).encode("utf-8") if body is not None else None
 
-    if body is not None:
-        data = json.dumps(body).encode("utf-8")
-
-    request = urllib.request.Request(
+    req = urllib.request.Request(
         API + path,
         data=data,
         method=method,
@@ -269,616 +257,260 @@ def call(method, path, body=None):
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=5) as response:
             raw = response.read()
-
-            if not raw:
-                return None
-
-            return json.loads(raw)
-
+            return json.loads(raw) if raw else None
     except urllib.error.HTTPError as e:
-        print("HTTP error:", e.code)
-        print(e.read().decode("utf-8", errors="replace"))
+        print(f"HTTP Error {e.code}: {e.read().decode('utf-8', errors='replace')}")
         raise
 
 
-setup = call("GET", "/setup")
-
-print(json.dumps(setup, indent=2, ensure_ascii=False))
+if __name__ == "__main__":
+    setup = call("GET", "/setup")
+    print("Match Setup Loaded Successfully:")
+    print(json.dumps(setup, indent=2))
 ```
 
-Chạy:
-
+Run:
 ```bash
 python connection_test.py
 ```
 
-Nếu in được JSON của `setup`, bot đã kết nối được với server.
+---
+
+## 10. Understanding `setup` and Hex Grid Indexing
+
+The `setup` payload contains:
+- `daySteps`: Number of actions per day per agent.
+- `width`, `height`: Grid dimensions $W \times H$.
+- `cells`: 1D array representing cell properties.
+- `spots`: Udon spots with position and score capacity.
+- `fuelLimits`: Maximum fuel limits by agent type.
+
+### 1D Cell Index Calculation:
+Given row $r$ and column $c$ on a grid of width $W$:
+$$\text{index} = r \times W + c$$
+
+Conversely:
+$$r = \lfloor \text{index} / W \rfloor, \quad c = \text{index} \bmod W$$
 
 ---
 
-# 9. Dữ liệu `setup`
+## 11. Agent Role Assignment (`POST /assignment`)
 
-Theo tài liệu challenge, khi lấy setup cần chú ý các trường như:
+Immediately following `/setup`, submit an assignment array specifying the type of each agent:
+- `0`: **Patrol Agent** (Xe tuần tra — collects Udon points, consumes fuel per movement).
+- `1`: **Refuel Agent** (Xe tiếp nhiên liệu — high capacity, transfers fuel to co-located patrol agents).
 
-```text
-daySteps
-map
-cells
-spots
-agents
-fuelLimits
-```
-
-Trong đó bản đồ được biểu diễn dạng lưới phẳng.
-
-Nếu:
-
-```text
-width = W
-row   = r
-col   = c
-```
-
-thì chỉ số cell được tính:
-
-```text
-index = r * W + c
-```
-
-Không nên giả định `cells` đã được server cung cấp dưới dạng danh sách hàng/cột 2 chiều.
-
----
-
-# 10. Gán loại tác nhân
-
-Sau khi nhận setup, đội gửi loại cho các agent.
-
-Theo tài liệu:
-
-```text
-0 = xe tuần tra
-1 = xe tiếp nhiên liệu
-```
-
-Ví dụ có 4 agent:
-
+For example, with 3 agents (2 Patrol, 1 Refuel):
 ```json
-[0, 0, 1, 1]
+[0, 0, 1]
 ```
-
-Gửi:
 
 ```python
-assignment = [0, 0, 1, 1]
-
-call(
-    "POST",
-    "/assignment",
-    assignment
-)
+assignment = [0, 0, 1]
+call("POST", "/assignment", assignment)
 ```
 
-> Số lượng phần tử phải khớp số agent của trận.
-
-Loại agent được chọn ở đầu trận và sau đó không đổi.
+> [!IMPORTANT]
+> The length of the assignment array must exactly match the number of agents allocated to your team in `setup`. Role assignments remain fixed for the duration of the match.
 
 ---
 
-# 11. Chờ trận bắt đầu
+## 12. Awaiting Match Start & Handling `HTTP 425 Too Early`
 
-Có thể gọi:
-
-```python
-call("GET", "/start")
-```
-
-Tài liệu lưu ý endpoint `/start` có thể trả:
-
-```text
-HTTP 425
-```
-
-khi trận **chưa tới giờ / chưa bắt đầu**.
-
-Trong trường hợp này, đợi rồi thử lại thay vì coi đó là lỗi logic của bot.
-
-Ví dụ:
+When querying `/start`, the server may return `HTTP 425` if the match is pending:
 
 ```python
 import time
 import urllib.error
 
+print("Waiting for match start...")
 while True:
     try:
         start_data = call("GET", "/start")
-        print("Match started")
+        print("Match started successfully!")
         break
-
     except urllib.error.HTTPError as e:
         if e.code == 425:
             time.sleep(0.5)
             continue
-
         raise
 ```
 
 ---
 
-# 12. Nhận state của từng ngày
+## 13. Parsing Daily Game State (`GET /state`)
 
-Trong vòng lặp trận:
-
-```python
-state = call("GET", "/state")
-```
-
-State ngày có thể chứa thông tin như:
-
-```text
-day
-agents
-others
-traffics
-```
-
-Agent có các dữ liệu cần thiết để ra quyết định như:
-
-```text
-kind
-pos
-fuel
-```
-
-Bot sử dụng state này để:
-
-1. cập nhật môi trường;
-2. chạy thuật toán phân công;
-3. chạy planner;
-4. tạo action cho từng agent;
-5. gửi kế hoạch lên server.
+Each day, call `GET /state` to retrieve dynamic game data:
+- `day`: Current day index.
+- `agents`: List of your team's agents (`kind`, `pos`, `fuel`, `score`).
+- `others`: Observed enemy agent coordinates.
+- `traffics`: Array of traffic density modifiers per cell.
 
 ---
 
-# 13. Format kế hoạch di chuyển
+## 14. Action Plan Formatting & Hex Directions
 
-Mỗi ngày bot gửi một **mảng của các mảng**.
+Actions must be submitted as a **list of lists** (one list of actions per agent).
 
-Mỗi agent có một chuỗi action.
+### Hex Direction Enums:
+| Value | Movement Direction |
+|:---:|---|
+| `0` | Up-Left (Tây Bắc) |
+| `1` | Up-Right (Đông Bắc) |
+| `2` | Right (Đông) |
+| `3` | Down-Right (Đông Nam) |
+| `4` | Down-Left (Tây Nam) |
+| `5` | Left (Tây) |
+| `-1` | **STAY** (Đứng yên 1 bước) |
 
-Direction theo tài liệu:
-
-```text
-0 = trên-trái
-1 = trên-phải
-2 = phải
-3 = dưới-phải
-4 = dưới-trái
-5 = trái
-```
-
-Ngoài ra:
-
-```text
--1 = đứng yên trong 1 bước
-```
-
-Ví dụ:
-
+### Format Example:
+For 2 agents with `daySteps = 3`:
 ```json
 [
-  [-1, 5],
-  [0, 1, -1]
+  [2, 2, -1],
+  [0, 1, 5]
 ]
 ```
+- **Agent 0**: Moves Right twice, then stands still on step 3.
+- **Agent 1**: Moves Up-Left, Up-Right, then Left.
 
-Ý nghĩa:
-
-```text
-Agent 0:
-    đứng yên 1 bước
-    sau đó đi hướng 5
-
-Agent 1:
-    đi hướng 0
-    đi hướng 1
-    đứng yên 1 bước
-```
-
-Tổng số bước của kế hoạch cho một agent không được vượt quá `daySteps`.
-
-Nếu thiếu bước có thể bổ sung `-1` để agent đứng yên.
+> [!NOTE]
+> If an agent finishes its path before `daySteps`, pad the remaining steps with `-1` (`Direction.STAY`).
 
 ---
 
-# 14. Gửi action
-
-Ví dụ:
+## 15. Submitting Actions (`POST /actions`)
 
 ```python
 actions = [
-    [-1, 5],
-    [0, 1, -1],
+    [2, 2, -1],
+    [0, 1, 5],
+    [-1, -1, -1],
 ]
 
-result = call(
-    "POST",
-    "/actions",
-    actions
-)
-
-print(result)
+response = call("POST", "/actions", actions)
+print("Server response:", response)
 ```
-
-Nếu trận có 4 agent thì phải gửi kế hoạch tương ứng cho đủ các agent của đội theo format mà server yêu cầu.
 
 ---
 
-# 15. Vòng lặp bot cơ bản
-
-Cấu trúc tối thiểu:
+## 16. Complete Autonomous Bot Lifecycle
 
 ```python
+# 1. Fetch initial configuration
 setup = call("GET", "/setup")
 
-assignment = choose_agent_types(setup)
+# 2. Assign agent roles
+call("POST", "/assignment", [0, 0, 1])
 
-call(
-    "POST",
-    "/assignment",
-    assignment
-)
+# 3. Wait for start
+wait_for_start()
 
-wait_until_start()
-
+# 4. Daily game loop
 while True:
-
     state = call("GET", "/state")
-
-    actions = plan_actions(
-        setup,
-        state
-    )
-
-    action_result = call(
-        "POST",
-        "/actions",
-        actions
-    )
-
-    if match_finished(action_result):
+    
+    # Hierarchical planning: MARL allocates targets, DP plans route
+    plan = strategy.plan_day(state, setup.daySteps)
+    
+    response = call("POST", "/actions", plan)
+    if response.get("finished", False):
         break
+    time.sleep(0.25)
 
-result = call("GET", "/result")
+# 5. Retrieve final match report
+results = call("GET", "/result")
+print("Match complete:", results)
 ```
 
-Với project DP + MARL của nhóm, phần:
+---
 
+## 17. Polling Rate Limiting (`HTTP 429`)
+
+The official server enforces a minimum polling interval:
+$$\text{Polling Interval} \ge 200\text{ ms}$$
+
+If requests are sent faster than 200 ms, the server will return `HTTP 429 Too Many Requests`.
+
+Always maintain a safe delay:
 ```python
-actions = plan_actions(setup, state)
-```
-
-có thể triển khai thành:
-
-```text
-state
-  │
-  ▼
-Multi-Agent RL
-  │
-  ├─ Agent 0 → Target A
-  ├─ Agent 1 → Target B
-  └─ Agent 2 → Refuel task
-  │
-  ▼
-Dynamic Programming / route planner
-  │
-  ▼
-direction 0..5
-  │
-  ▼
-POST /actions
+time.sleep(0.25)  # 250 ms safe buffer
 ```
 
 ---
 
-# 16. Không poll server quá nhanh
-
-Theo tài liệu:
+## 18. Recommended Debugging Flowchart
 
 ```text
-poll >= 200 ms
-```
-
-Nếu gửi request quá nhanh có thể nhận:
-
-```text
-HTTP 429
-```
-
-Do đó nên có khoảng nghỉ giữa các lần polling:
-
-```python
-import time
-
-time.sleep(0.2)
-```
-
-Có thể dùng lớn hơn một chút, ví dụ:
-
-```python
-time.sleep(0.25)
-```
-
-để tránh chạm rate limit do sai số thời gian.
-
-Khi nhận `HTTP 429`, chờ rồi thử lại.
-
----
-
-# 17. WebSocket
-
-WebSocket có dạng được tài liệu mô tả:
-
-```text
-ws://.../ws/v1/matches/{id}?token=<token>
-```
-
-Phía server đẩy các frame theo thứ tự logic:
-
-```text
-setup
-  ↓
-bot gửi loại agent
-  ↓
-day_state
-  ↓
-bot gửi kế hoạch
-  ↓
-day_state
-  ↓
-bot gửi kế hoạch
-  ↓
-...
-  ↓
-result
-```
-
-Mỗi frame là một JSON message.
-
-Tài liệu lưu ý message **không có trường `type` để phân biệt**, vì vậy client cần theo dõi đang ở giai đoạn nào của protocol để giải mã đúng message.
-
-Với project đầu tiên, HTTP polling dễ debug hơn. Chỉ nên chuyển sang WebSocket khi phiên bản HTTP đã chạy ổn định.
-
----
-
-# 18. Luồng debug khuyến nghị
-
-Khi bot chưa chạy được, kiểm tra lần lượt:
-
-```text
-[1] Login website được?
-        ↓
-[2] Có API token?
-        ↓
-[3] Có trận trong "Trận của tôi"?
-        ↓
-[4] Có MATCH_ID đúng?
-        ↓
-[5] GET /setup trả JSON?
-        ↓
-[6] POST /assignment thành công?
-        ↓
-[7] /start đã qua trạng thái 425?
-        ↓
-[8] GET /state trả state?
-        ↓
-[9] Action có đúng format?
-        ↓
-[10] POST /actions thành công?
-        ↓
-[11] Theo dõi thay đổi trên giao diện trận
-        ↓
-[12] GET /result khi trận kết thúc
-```
-
-Không nên debug thuật toán RL trước khi các bước `[1] → [10]` hoạt động ổn định.
-
----
-
-# 19. Một bot "smoke test" nên làm gì?
-
-Trước khi tích hợp Dynamic Programming hoặc Multi-Agent RL, hãy viết một bot cực đơn giản.
-
-Ví dụ:
-
-```text
-Mỗi ngày:
-    tất cả agent đứng yên
-```
-
-Kế hoạch:
-
-```python
-actions = [
-    [-1] * day_steps
-    for _ in range(number_of_agents)
-]
-```
-
-Mục đích không phải để thắng.
-
-Mục đích là xác nhận toàn bộ pipeline:
-
-```text
-Token
-→ setup
-→ assignment
-→ start
-→ state
-→ actions
-→ result
-```
-
-chạy chính xác.
-
-Sau đó mới thay `plan_actions()` bằng thuật toán thật.
-
----
-
-# 20. Các lỗi thường gặp
-
-## `401 Unauthorized`
-
-Kiểm tra:
-
-```text
-Authorization: Bearer <token>
-```
-
-và token có còn hiệu lực hay không.
-
----
-
-## `425`
-
-Trận chưa bắt đầu hoặc chưa đến thời điểm có thể bắt đầu.
-
-Chờ rồi thử lại.
-
----
-
-## `429`
-
-Bot polling quá nhanh.
-
-Đảm bảo khoảng cách giữa các lần poll tối thiểu khoảng:
-
-```text
-200 ms
+[1] Log in with team022 / 11aaAA@@
+        │
+        ▼
+[2] Verify active API Bearer Token
+        │
+        ▼
+[3] Confirm Match ID in "Trận của tôi"
+        │
+        ▼
+[4] GET /setup returns valid 200 JSON
+        │
+        ▼
+[5] POST /assignment matches agent count
+        │
+        ▼
+[6] GET /start resolves past HTTP 425
+        │
+        ▼
+[7] GET /state returns day and agent data
+        │
+        ▼
+[8] Action arrays validated (length <= daySteps, directions in [-1, 0..5])
+        │
+        ▼
+[9] POST /actions returns { status: "accepted" }
+        │
+        ▼
+[10] Live UI reflects movements in real time
+        │
+        ▼
+[11] GET /result prints final scores
 ```
 
 ---
 
-## Action bị từ chối
+## 19. Troubleshooting & Common Error Codes
 
-Kiểm tra:
+### `HTTP 401 Unauthorized`
+- Missing or malformed `Authorization: Bearer <TOKEN>` header.
+- Token expired or revoked on the web portal.
 
-- direction có thuộc `0..5` hoặc `-1`;
-- số agent có đúng;
-- tổng bước không vượt `daySteps`;
-- action có đi qua ô không hợp lệ hay không;
-- nhiên liệu có đủ hay không;
-- JSON có đúng format hay không.
+### `HTTP 425 Too Early`
+- Match has not started yet. Implement exponential or linear polling backoff (`time.sleep(0.5)`).
 
-Một agent có kế hoạch sai có thể làm lượt bị từ chối, vì vậy nên validate action trước khi gửi.
+### `HTTP 429 Too Many Requests`
+- Polling frequency exceeded 200 ms. Increase interval to `250 ms` – `500 ms`.
 
----
-
-# 21. Cấu trúc code nên dùng
-
-```text
-procon-bot/
-│
-├── main.py
-│
-├── config.py
-│
-├── client/
-│   ├── http_client.py
-│   └── websocket_client.py
-│
-├── env/
-│   ├── map.py
-│   ├── state.py
-│   └── rules.py
-│
-├── planner/
-│   ├── value_iteration.py
-│   └── policy_iteration.py
-│
-├── marl/
-│   ├── agent.py
-│   └── task_allocator.py
-│
-├── strategy/
-│   └── hybrid.py
-│
-└── tests/
-    ├── test_connection.py
-    ├── test_map.py
-    └── test_actions.py
-```
-
-Trong giai đoạn đầu chỉ cần:
-
-```text
-main.py
-client/http_client.py
-tests/test_connection.py
-```
-
-Sau khi kết nối server ổn định mới thêm DP/MARL.
+### Action Plan Rejected
+- Action direction contains invalid integer (must be `-1` or `0..5`).
+- Length of action list does not equal `daySteps`.
+- Number of agent plans does not match team agent count.
+- Vehicle attempted to enter impassable terrain (`TerrainType.POND`).
+- Insufficient fuel for planned movements.
 
 ---
 
-# 22. Checklist trước trận
+## 20. Pre-Match Checklist
 
-```text
-[ ] Login được PROCON
-[ ] Có API token
-[ ] Không commit token lên Git
-[ ] Có MATCH_ID
-[ ] GET /setup hoạt động
-[ ] Assignment đúng số agent
-[ ] Xử lý HTTP 425
-[ ] Poll >= 200 ms
-[ ] Xử lý HTTP 429
-[ ] Parse /state thành công
-[ ] Action chỉ chứa -1 hoặc 0..5
-[ ] Mỗi plan không vượt daySteps
-[ ] Validate fuel
-[ ] Validate cell kế tiếp
-[ ] POST /actions thành công
-[ ] Mở "Trận của tôi" để theo dõi trận
-[ ] GET /result hoạt động
-```
+Before initiating official competition matches:
 
----
-
-# 23. Luồng làm việc đề xuất cho project
-
-Trong quá trình phát triển:
-
-```text
-Tạo trận luyện tập
-        ↓
-Lấy MATCH_ID
-        ↓
-Chạy connection_test.py
-        ↓
-Chạy bot đứng yên
-        ↓
-Mở trận trên website để quan sát
-        ↓
-Thêm parser map + state
-        ↓
-Thêm Dynamic Programming
-        ↓
-Thêm MARL task allocation
-        ↓
-Thêm refuel / traffic / reward
-        ↓
-Kiểm tra bot trước trận
-        ↓
-Đấu luyện tập nhiều seed/config
-        ↓
-Đấu đội thật
-```
-
-Nguyên tắc quan trọng:
-
-> **Kết nối server và protocol phải chạy ổn trước; thuật toán thông minh thêm sau.**
-
-Điều này giúp tách lỗi API khỏi lỗi thuật toán và làm project dễ debug hơn rất nhiều.
+- [ ] Logged into `https://procon.ptit.edu.vn` with `team022`.
+- [ ] Valid API Bearer Token copied into local `.env`.
+- [ ] `.env` confirmed excluded by `.gitignore` (no secrets pushed).
+- [ ] `MATCH_ID` updated to match tournament assignment.
+- [ ] `GET /setup` tested and verified.
+- [ ] Agent count in `assignment` validated.
+- [ ] Polling delay set to $\ge 250\text{ ms}$.
+- [ ] Decision latency verified under 500 ms (safety limit < 950 ms).
+- [ ] Live visualizer page opened in browser for real-time monitoring.
+- [ ] `python run_match.py -m <MATCH_ID>` launched and synchronized.
