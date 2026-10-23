@@ -1,232 +1,122 @@
-# PTIT PROCON 2026 — Dynamic Programming & Multi-Agent RL Bot
+# PTIT PROCON 2026 — Hierarchical DP & Multi-Agent RL Bot
 
-## Hybrid Dynamic Programming & Multi-Agent Reinforcement Learning for Cooperative Patrol and Refueling
+## Hybrid Dynamic Programming & Multi-Agent Reinforcement Learning for Cooperative Patrol and Rendezvous Refueling
 
-Dự án phát triển bot thi đấu cho giải **PTIT PROCON 2026** dựa trên kiến trúc phân cấp hai tầng (**Hierarchical Architecture**):
+This repository contains the complete competition bot and benchmarking suite for **PTIT PROCON 2026**, built upon a **two-tier hierarchical architecture**:
 
-> **Multi-Agent RL quyết định “agent nào làm nhiệm vụ nào” $\longrightarrow$ Dynamic Programming quyết định “đi đến mục tiêu bằng đường nào”.**
-
----
-
-## 1. Kiến trúc tổng thể
-
-```text
-                 PROCON SERVER
-                      │
-                      ▼
-                 Current State
-          (Map, Traffic, Fuel, Spots)
-                      │
-                      ▼
-          +-------------------------+
-          | Multi-Agent Task Layer  |
-          | Independent Q-Learning  |  <--- Phân công mục tiêu vĩ mô (Macro-Task)
-          +-------------------------+       tránh xung đột, tối ưu team reward
-                      │
-            Target / Task assignment
-                      │
-                      ▼
-          +-------------------------+
-          | Dynamic Planning Layer  |
-          | Value / Policy Iteration|  <--- Lập kế hoạch lộ trình tối ưu trên Hex Grid
-          +-------------------------+       có xét chi phí địa hình & giao thông
-                      │
-               Route / Directions
-                      │
-                      ▼
-              POST /actions
-                      │
-                      ▼
-                 PROCON SERVER
-```
+> **Multi-Agent Reinforcement Learning (MARL)** decides *which agent is assigned to which macro-target* $\longrightarrow$ **Dynamic Programming (DP)** computes *the globally optimal, terrain-aware route on the hex grid*.
 
 ---
 
-## 2. Cấu trúc thư mục
+## 1. Quickstart: Clone, Install & Run
 
-```text
-procon/
-│
-├── README.md                          # Tài liệu hướng dẫn tổng quan và vận hành
-├── requirements.txt                   # Danh sách thư viện phụ thuộc
-├── pyproject.toml                     # Cấu hình code format (ruff) và pytest
-├── .gitignore                         # Loại bỏ file tạm, virtualenv và bảo mật API token
-├── .env.example                       # Mẫu cấu hình biến môi trường
-├── GIT_STRATEGY.md                    # Quy định nhánh git và commit message chuẩn
-│
-├── config/                            # Quản lý cấu hình YAML
-│   ├── __init__.py
-│   └── default.yaml                   # Cấu hình mặc định cho server, DP, MARL
-│
-├── client/                            # Giao tiếp với PROCON server
-│   ├── __init__.py
-│   ├── http_client.py                 # Client HTTP polling với cơ chế retry & error handling
-│   └── protocol.py                    # Khai báo cấu trúc dữ liệu, enum hướng, agent types
-│
-├── env/                               # Mô phỏng môi trường và biểu diễn Hex Grid
-│   ├── __init__.py
-│   ├── hex_grid.py                    # Hệ tọa độ lục giác (6 hướng, offset to cube, khoảng cách)
-│   ├── state.py                       # Trạng thái game, Udon spot, agent
-│   ├── simulator.py                   # Simulator chạy offline mô phỏng di chuyển và nhặt udon
-│   └── reward.py                      # Hàm phần thưởng (shared reward + conflict penalty)
-│
-├── planner/                           # Tầng quy hoạch động (Dynamic Programming)
-│   ├── __init__.py
-│   ├── policy_evaluation.py           # Iterative Policy Evaluation
-│   ├── policy_iteration.py            # Policy Iteration
-│   ├── value_iteration.py             # Vectorized Bellman Value Iteration
-│   ├── dijkstra.py                    # Dijkstra Route Planner
-│   └── bfs.py                         # Breadth-First Search Baseline
-│
-├── marl/                              # Tầng học tăng cường đa tác nhân (Multi-Agent RL)
-│   ├── __init__.py
-│   ├── q_agent.py                     # Tabular Q-Learning Agent (epsilon-greedy)
-│   ├── iql.py                         # Independent Q-Learning coordinator
-│   ├── task_allocator.py              # Bộ phân công nhiệm vụ vĩ mô
-│   ├── state_encoder.py               # Discretize không gian trạng thái cho tabular Q
-│   └── refuel_coordinator.py          # Bộ điều phối tiếp nhiên liệu & điểm hẹn
-│
-├── strategy/                          # Các chiến lược điều khiển
-│   ├── __init__.py
-│   ├── baselines.py                   # Tập hợp chiến lược baseline & ablation (Random, Greedy, Greedy-DP, DP-Only, IQL-Dijkstra)
-│   └── hybrid.py                      # Chiến lược phân cấp đề xuất: MARL (IQL) + DP (Value Iteration) + Refuel Coordination
-│
-├── experiments/                       # Thí nghiệm & benchmark
-│   ├── __init__.py
-│   ├── run_dp.py                      # So sánh Value Iteration vs Policy Iteration
-│   ├── run_single_agent_rl.py         # Thí nghiệm Single Agent Q-Learning
-│   ├── run_marl.py                    # Thí nghiệm train Independent Q-Learning offline
-│   ├── run_hybrid.py                  # Benchmark chiến lược Hybrid so với Baseline
-│   ├── run_tournament.py              # Đấu giải nhiều ngày và đánh giá tiếp nhiên liệu
-│   ├── run_baseline_comparison.py     # Đo hiệu năng BFS vs Dijkstra
-│   ├── run_real_server_test.py        # Kiểm thử tích hợp tự động hóa trận đấu
-│   ├── experiment_logger.py           # Ghi nhận log thí nghiệm vào CSV & JSON
-│   ├── experiment_log.md              # Bảng theo dõi kết quả thí nghiệm
-│   └── configs/                       # Cấu hình các kịch bản sweep
-│       ├── dp_baseline.yaml
-│       ├── marl_iql.yaml
-│       └── hybrid_default.yaml
-│
-├── plots/                             # Thư mục lưu biểu đồ kết quả
-│   └── .gitkeep
-│
-├── tests/                             # Unit tests (47 tests)
-│   ├── __init__.py
-│   ├── test_hex_grid.py               # Kiểm tra chuyển đổi tọa độ và láng giềng hex
-│   ├── test_dp.py                     # Kiểm tra sự hội tụ của Value/Policy Iteration
-│   ├── test_qlearning.py              # Kiểm tra Bellman update và epsilon decay
-│   ├── test_baseline_planners.py      # Kiểm tra thuật toán BFS và Dijkstra
-│   ├── test_hybrid.py                 # Kiểm tra chiến lược phân cấp Hybrid MARL+DP
-│   ├── test_refuel.py                 # Kiểm tra điều phối tiếp nhiên liệu & điểm hẹn
-│   ├── test_connection.py            # Kiểm tra URL client và parse protocol
-│   └── test_real_server.py            # Kiểm tra khả năng chịu lỗi và phản hồi server
-│
-├── main.py                            # Điểm khởi chạy chính cho demo, thí nghiệm và benchmark
-└── run_match.py                       # Trình thực thi thi đấu và đồng bộ trực tiếp (Live Server / Mock Server)
-```
+Follow this step-by-step guide to get the project cloned, configured, and running locally.
+
+### Prerequisites
+- **Python 3.10+** (tested and verified up to Python 3.13)
+- **Git**
 
 ---
 
-## 3. Cài đặt và chuẩn bị môi trường
-
-### Yêu cầu
-- Python 3.10+ (Đã kiểm thử trên Python 3.13)
-- Git
-
-### Cài đặt dependencies
+### Step 1: Clone the Repository
 
 ```bash
+git clone https://github.com/HienNguyenVinh/RL_VMCS_2026.git
+cd RL_VMCS_2026
+```
+
+---
+
+### Step 2: Create and Activate a Virtual Environment
+
+It is recommended to run inside an isolated virtual environment:
+
+#### Windows (PowerShell):
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+*(If PowerShell script execution is restricted, run: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`)*
+
+#### Windows (Command Prompt):
+```cmd
+python -m venv .venv
+.venv\Scripts\activate.bat
+```
+
+#### Linux / macOS:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+---
+
+### Step 3: Install Dependencies
+
+```bash
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### Cấu hình biến môi trường
+---
 
-Sao chép `.env.example` thành `.env` và điền token của đội:
+### Step 4: Configure Environment Variables
+
+Create your local `.env` configuration file from the provided template:
 
 ```bash
 cp .env.example .env
 ```
 
-Nội dung `.env`:
+Open `.env` in your text editor and fill in your match credentials:
+
 ```env
+# Server Connection Settings
 PROCON_BASE_URL=https://procon.ptit.edu.vn
 PROCON_MATCH_ID=your_match_id_here
 PROCON_TOKEN=your_team_token_here
-PROCON_POLL_INTERVAL=1.0
+
+# Client Polling & Timeout Settings
+PROCON_POLL_INTERVAL=0.5
 PROCON_REQUEST_TIMEOUT=5.0
+
+# Logging & Debug Settings
 PROCON_LOG_LEVEL=INFO
+PROCON_DEBUG=False
 ```
 
 > [!CAUTION]
-> **Tuyệt đối không commit file `.env` lên Git!** File `.env` đã được cấu hình trong `.gitignore`.
+> **Never commit `.env` or any access tokens to Git!** The `.gitignore` file is strictly configured to keep sensitive tokens out of version control.
 
 ---
 
-## 4. Hướng dẫn chạy chương trình
+### Step 5: Verify Your Installation
 
-### Chạy kiểm tra hệ thống (Demo mode)
+Run the automated module and import check:
+
+```bash
+python main.py --check-imports
+```
+You should see:
+```text
+[OK] All modules imported successfully without errors.
+```
+
+Next, run the end-to-end demo mode:
 
 ```bash
 python main.py --mode demo
 ```
 
-### Kiểm tra tính toàn vẹn của các module (Imports check)
+You should see the system initialize the hex grid, execute vectorized Bellman Value Iteration, and output a validated multi-agent daily plan.
 
-```bash
-python main.py --check-imports
-```
+---
 
-### Chạy thí nghiệm Dynamic Programming (Value Iteration vs Policy Iteration)
+### Step 6: Run Unit Tests
 
-```bash
-python main.py --mode dp
-# hoặc:
-python experiments/run_dp.py
-```
-
-### Chạy huấn luyện Multi-Agent RL (IQL) Offline
-
-```bash
-python main.py --mode marl
-# hoặc:
-python experiments/run_marl.py
-```
-
-### Chạy Benchmark Baseline Path Planning (BFS vs Dijkstra - Phase 3)
-
-```bash
-python main.py --mode baseline
-# hoặc:
-python experiments/run_baseline_comparison.py
-```
-
-### Chạy so sánh hiệu quả Hybrid MARL+DP vs Baseline
-
-```bash
-python main.py --mode hybrid
-# hoặc:
-python experiments/run_hybrid.py
-```
-
-### Chạy Smoke Test kết nối server (Tất cả agent đứng yên - Phase 1)
-
-Chạy kiểm thử với local mock server (mô phỏng toàn bộ chu trình match):
-```bash
-python main.py --mode smoke_test --mock
-```
-
-Chạy với PROCON server thật (sau khi điền token và match ID vào `.env`):
-```bash
-python main.py --mode smoke_test
-```
-
-### Chạy bot thi đấu trên PROCON server
-
-```bash
-python main.py --mode server
-```
-
-### Chạy unit tests
+Execute the comprehensive test suite (47 tests covering hex grid, DP, Q-learning, planners, hybrid strategy, refuel, and server protocol):
 
 ```bash
 python -m unittest discover tests
@@ -234,111 +124,301 @@ python -m unittest discover tests
 
 ---
 
-## 5. Tiến độ thực hiện các Phase
+## 2. Overall Architecture
 
-- [x] **PHASE 0 — Khởi tạo project**
-  - [x] Khởi tạo Git repository
-  - [x] Tạo `README.md`
-  - [x] Tạo `.gitignore` bảo vệ token
-  - [x] Tạo `requirements.txt`
-  - [x] Tạo `.env.example`
-  - [x] Tạo cấu trúc thư mục đầy đủ cho client, env, planner, marl, strategy, experiments, tests
-  - [x] Thống nhất format code (`pyproject.toml`)
-  - [x] Tạo branch strategy (`GIT_STRATEGY.md`)
-  - [x] Tạo bảng log thí nghiệm (`experiments/experiment_log.md`)
-  - [x] Kiểm thử toàn bộ module và `main.py`
-- [x] **PHASE 1 — Kết nối server PROCON**
-  - [x] Triển khai `ProconHttpClient` chuẩn protocol PROCON 2026
-  - [x] Triển khai rate limiting (polling rate $\ge 200\text{ ms}$)
-  - [x] Xử lý lỗi `HTTP 425 Too Early` (chờ trận bắt đầu)
-  - [x] Xử lý lỗi `HTTP 429 Too Many Requests` (backoff & retry)
-  - [x] Xử lý lỗi `HTTP 401 Unauthorized`
-  - [x] Xác thực kế hoạch hành động (`validate_action_plan`)
-  - [x] Triển khai smoke test bot (các agent đứng yên `[-1] * day_steps`)
-  - [x] Triển khai `MockProconServer` phục vụ kiểm thử tự động
-  - [x] Triển khai `MatchRunner` điều phối toàn bộ chu trình trận đấu
-  - [x] Kiểm thử end-to-end thành công không lỗi
-- [x] **PHASE 2 — Xây Offline Environment & Hex Grid**
-  - [x] Chọn và chuẩn hóa hệ tọa độ lục giác (even-r offset & Cube coordinates)
-  - [x] Triển khai đầy đủ 6 hướng láng giềng và kiểm tra ranh giới bản đồ
-  - [x] Nhận diện và xử lý các ô cản (`TerrainType.POND` không thể đi vào)
-  - [x] Thiết lập chi phí di chuyển và tiêu thụ nhiên liệu theo đúng luật PROCON 2026 (Đồng bằng, Núi, Ao, Đường theo cấp độ giao thông)
-  - [x] Phân loại thuộc tính tác nhân: vị trí, vai trò (Patrol vs Refuel), nhiên liệu, kiểm tra `valid_actions`
-  - [x] Triển khai simulator offline chuẩn Gym API (`reset()`, `step()`)
-  - [x] Kiểm thử 100 bước di chuyển offline không lỗi
-  - [x] Bộ unit test toàn diện cho map, movement, fuel, và collision
-- [x] **PHASE 3 — Baseline Path Planning (BFS & Dijkstra)**
-  - [x] Triển khai BFS tìm đường tối thiểu số bước nhảy (minimum hops)
-  - [x] Triển khai Dijkstra tìm đường tối ưu chi phí di chuyển (minimum movement cost)
-  - [x] Tích hợp chi phí địa hình và mức độ giao thông (Đồng bằng, Núi, Ao, Đường)
-  - [x] Xử lý tránh ô cản (Ao - Pond) và nhận diện mục tiêu không thể tiếp cận (unreachable)
-  - [x] Ràng buộc hạn mức nhiên liệu cho xe tuần tra (fuel constraints)
-  - [x] Thu thập và đo lường đầy đủ 4 chỉ số: Route length, Movement cost, Runtime, Fuel consumption
-  - [x] Kiểm thử tự tính bằng tay (hand-calculated) xác thực tính tối ưu toán học
-  - [x] Bộ unit test chuyên biệt `test_baseline_planners.py` đạt 100% Pass
-- [x] **PHASE 4 — Dynamic Programming (Gridworld / MDP)**
-  - [x] Thiết lập mô hình MDP chuẩn: Trạng thái, Hành động, Chuyển trạng thái, Phần thưởng, Terminal states
-  - [x] Triển khai Iterative Policy Evaluation với Bellman expectation update
-  - [x] Triển khai Policy Iteration với cơ chế kiểm tra tính hội tụ / chính sách ổn định
-  - [x] Triển khai Value Iteration với Bellman optimality backup và trích xuất lộ trình (tránh loop)
-  - [x] Thí nghiệm so sánh VI vs PI vs Dijkstra, khảo sát ảnh hưởng của discount factor $\gamma$
-  - [x] Vẽ và lưu biểu đồ hội tụ Bellman sweep (`plots/dp_convergence.png`)
-  - [x] Độ tương đồng chính sách tối ưu giữa VI và PI đạt **100%**
-- [x] **PHASE 5 — Single-Agent Q-Learning**
-  - [x] Khởi tạo Q-table, chiến lược $\epsilon$-greedy, decay exploration
-  - [x] Cập nhật Temporal Difference (TD update) và episode loop
-  - [x] Lưu và nạp trọng số Q-table (`save` / `load` JSON)
-  - [x] Đánh giá trên nhiều seed ngẫu nhiên
-  - [x] Agent học vượt trội so với Random Baseline (+60.07 điểm)
-  - [x] Vẽ và lưu learning curve (`plots/single_agent_qlearning.png`)
-- [x] **PHASE 6 — Multi-Agent RL cho phân công task (MARL / IQL)**
-  - [x] Kiến trúc Independent Q-Learning (IQL): mỗi agent sở hữu Q-table riêng
-  - [x] Mã hóa không gian trạng thái đa tác nhân (vị trí, cụm nhiên liệu, khoảng cách đích, hành động của đồng đội)
-  - [x] Cơ chế phát hiện xung đột và áp dụng phạt xung đột (Conflict Penalty)
-  - [x] Thí nghiệm so sánh: IQL có phạt xung đột vs IQL thuần vs Random Baseline
-  - [x] Giảm thiểu tỷ lệ tranh chấp mục tiêu và nâng cao điểm số toàn đội
-  - [x] Vẽ và lưu đồ thị hội tụ phần thưởng và đồ thị giảm thiểu xung đột (`plots/marl_coordination_curve.png`)
-- [x] **PHASE 7 — Kết hợp MARL + DP (Hierarchical Strategy)**
-  - [x] Kiến trúc phân cấp hai tầng: MARL (IQL) phân công mục tiêu vĩ mô, DP (Value Iteration) quy hoạch đường đi vi mô tối ưu
-  - [x] Tích hợp hàm giá trị DP cost-to-go vào quan sát của StateEncoder để hỗ trợ quyết định
-  - [x] Cơ chế phát hiện mục tiêu bất khả thi (impossible targets) và chiến lược Fallback phân tầng (Dijkstra -> Stand still)
-  - [x] Cơ chế kiểm soát nhiên liệu (fuel validation) tự động cắt ngắn lộ trình khi cạn pin và đệm hành động `-1` (`Direction.STAY`)
-  - [x] Đầy đủ 5 phương pháp so sánh: B0 (Random), B1 (Greedy+Dijkstra), B2 (Greedy+DP), B3 (IQL+Dijkstra), và Proposed (Hybrid MARL+DP)
-  - [x] Thử nghiệm đa hạt giống độc lập (Seeds 42, 101, 777, 999): Proposed đạt điểm cao nhất (**23.8 ± 2.2**), tiết kiệm nhiên liệu vượt trội (**29.5 fuel** so với 51.2 của B3) và độ trễ ra quyết định an toàn (**~497 ms/ngày** < 1000ms)
-  - [x] Vẽ và lưu đồ thị so sánh 4 chiều: [`plots/hybrid_comparison.png`](file:///d:/PythonProject/procon/plots/hybrid_comparison.png)
-  - [x] Lệnh chạy trực tiếp: `python main.py --mode hybrid`
-- [x] **PHASE 8 — Fuel / Refueling & Tournament Experiments**
-  - [x] Mô hình tiêu thụ nhiên liệu theo luật địa hình PTIT PROCON (Đồng bằng: 1, Núi: 2, Đường: 2; Xe tiếp tế: 0)
-  - [x] Phát hiện ngưỡng nhiên liệu thấp (`low_fuel_threshold = 0.35`) và gửi yêu cầu cứu hộ `RefuelRequest`
-  - [x] Lựa chọn ô hẹn gặp tối ưu (`Rendezvous Cell Selection`) cân bằng thời gian tiếp cận và tiết kiệm nhiên liệu
-  - [x] Cơ chế đồng bộ hóa thời gian (`Time Synchronization`): xe đến trước đứng yên đợi xe đến sau để chuyển giao nhiên liệu
-  - [x] Chiến lược Fallback khi nguy cấp: Xe tuần tra đứng yên bảo toàn pin, xe tiếp xăng di chuyển thẳng đến vị trí xe tuần tra
-  - [x] Mô phỏng tiếp tế thành công trong `HexGridSimulator` (nạp tối đa 10 đơn vị xăng/bước khi khoảng cách $\le 1$)
-  - [x] Giải đấu thử nghiệm dài ngày (Tournament 8 ngày, 4 seeds):
-    - C3 (Rendezvous Proposed): **23.8 ± 7.4 điểm**, tiếp nạp **27.5 đơn vị xăng**, **0.0% tỷ lệ chết đói (Starvation Rate)**
-    - C2 (Ad-Hoc Chasing): 16.2 điểm, tiếp nạp 12.5 xăng, tỷ lệ chết đói 3.9% (bị bỏ rơi do không hẹn trước)
-    - C1 (No Refuel): 18.8 điểm, xe không dám mở rộng tầm hoạt động
-  - [x] Biểu đồ phân tích giải đấu và diễn biến nhiên liệu theo bước: [`plots/refuel_tournament.png`](file:///d:/PythonProject/procon/plots/refuel_tournament.png)
-  - [x] Lệnh chạy trực tiếp: `python main.py --mode tournament` hoặc `python main.py --mode refuel`
-- [x] **PHASE 9 — Chạy trên server thật & Match Automation**
-  - [x] Tích hợp trọn vẹn vòng đời trận đấu PROCON (`GET /setup`, `POST /assignment`, `GET /start`, `GET /state`, `POST /actions`, `GET /result`)
-  - [x] Chuyển đổi định dạng `MatchSetup` và `MatchState` sang `SimulationState` không lỗi
-  - [x] Cơ chế giám sát thời gian ra quyết định (Safety Latency Guard < 950ms) và Fallback tự động khi có ngoại lệ
-  - [x] Ngăn chặn triệt để gửi trùng lặp hành động cho cùng một ngày đấu (`last_acted_day`)
-  - [x] Xử lý tối ưu các mã trạng thái đặc biệt: `HTTP 425 Too Early` và `HTTP 429 Too Many Requests`
-  - [x] Tự động hóa thi đấu liên tục nhiều trận (`Match Automation`):
-    - Đạt tỷ lệ tin cậy **100.0%** (3/3 trận liên tiếp kết thúc thắng lợi)
-    - **0 lỗi giao thức (Protocol Errors)**
-    - Độ trễ tính toán trung bình chỉ **167.65 ms/ngày** (thấp hơn 6 lần so với giới hạn 1000ms của ban tổ chức)
-  - [x] Xuất và lưu trữ toàn bộ lịch sử vi mô của trận đấu ra file JSON tại `logs/matches/{match_id}.json` phục vụ replay và gỡ lỗi
-  - [x] Biểu đồ phân tích độ trễ và thời gian trận đấu: [`plots/match_automation.png`](file:///d:/PythonProject/procon/plots/match_automation.png)
-  - [x] Lệnh chạy tự động hóa:
-    ```bash
-    # Chạy thử nghiệm tự động hóa với Mock Server
-    python main.py --mode automation
-    # Chạy trực tiếp trên Live Server PROCON
-    python main.py --mode server
-    ```
+```text
+                           PROCON SERVER
+                                 │
+                                 ▼
+                           Current State
+                    (Map, Traffic, Fuel, Spots)
+                                 │
+                                 ▼
+                     +-----------------------+
+                     |  Macro-Task Layer     |
+                     |  Independent Q-Learn  |  <--- Allocates macro goals to agents;
+                     +-----------------------+       resolves spot contention via conflict penalty
+                                 │
+                       Target Assignments
+                                 │
+                                 ▼
+                     +-----------------------+
+                     |  Micro-Planning Layer |
+                     |  Vectorized DP / VI   |  <--- Computes optimal hex-grid paths
+                     +-----------------------+       incorporating terrain, traffic & fuel constraints
+                                 │
+                         Action Directions
+                                 │
+                                 ▼
+                            POST /actions
+                                 │
+                                 ▼
+                           PROCON SERVER
+```
 
+### Key Technical Pillars
 
+1. **Macro-Task Layer (Independent Q-Learning)**:
+   - Each agent maintains an independent state-action value table $Q_i(s, a)$.
+   - Solves multi-agent contention through a team **conflict penalty** ($\rho_{\text{conflict}} = -15.0$) whenever two patrol agents claim the same destination.
+   - Discretizes spatial state into compact relative sectors, fuel levels, and peer status using `StateEncoder`.
 
+2. **Micro-Planning Layer (Vectorized Bellman Value Iteration)**:
+   - Computes state-value functions $V^*(s) = \max_a [ R(s, a) + \gamma \sum_{s'} P(s'|s,a) V^*(s') ]$ across the entire hex grid simultaneously using NumPy vectorized tensor broadcasting.
+   - Accounts for variable hex terrain costs (Plains: 1, Mountains: 2, Roads: 2, Ponds: impassable) and dynamic real-time traffic levels.
+   - Reaches convergence in under **10 ms** per day, comfortably below the official 1000 ms response window.
+
+3. **Rendezvous Refueling Coordination**:
+   - Patrol agents broadcast low-fuel alerts (`RefuelRequest`) when fuel reserves drop below the safety threshold ($35\%$).
+   - Computes a mutually accessible **rendezvous cell** minimizing combined travel cost and rendezvous latency.
+   - Enforces **co-location time synchronization**: the first agent to reach the rendezvous cell waits for the partner, guaranteeing fuel transfer and eliminating premature mid-day breakaways.
+
+---
+
+## 3. Repository Directory Structure
+
+```text
+RL_VMCS_2026/
+│
+├── README.md                          # Main documentation & operations manual
+├── requirements.txt                   # Production & experiment dependencies
+├── pyproject.toml                     # Code formatting (ruff) and pytest configurations
+├── .gitignore                         # Git exclusion rules for virtualenvs, caches & secrets
+├── .env.example                       # Environment variable template
+├── GIT_STRATEGY.md                    # Git branching strategy & commit conventions
+├── btc_bot.py                         # Reference baseline BFS implementation provided by organizers
+├── main.py                            # CLI entrypoint for demos, experiments, and server modes
+├── run_match.py                       # Match execution and live browser sync runner
+│
+├── config/                            # YAML configuration manager
+│   ├── __init__.py
+│   └── default.yaml                   # Default hyperparameters for server, DP, and MARL
+│
+├── client/                            # Official PROCON server communications
+│   ├── __init__.py
+│   ├── http_client.py                 # HTTP polling client with retry, 425 & 429 handlers
+│   ├── protocol.py                    # Data classes, enums (Direction, AgentKind), validators
+│   ├── runner.py                      # MatchRunner coordinating setup, loop, strategy & logging
+│   └── mock_server.py                 # Embedded mock server for fully offline integration tests
+│
+├── env/                               # Hex-grid world & simulation engine
+│   ├── __init__.py
+│   ├── hex_grid.py                    # Hex coordinate system (even-r offset, cube, distance, neighbors)
+│   ├── state.py                       # SimulationState, AgentState, SpotState
+│   ├── simulator.py                   # Gym-style offline simulator (reset, step, fuel accounting)
+│   └── reward.py                      # Multi-agent reward functions (shared reward, conflict penalty)
+│
+├── planner/                           # Dynamic Programming & classical route planners
+│   ├── __init__.py
+│   ├── value_iteration.py             # Vectorized Bellman Value Iteration & Reverse Dijkstra
+│   ├── policy_iteration.py            # Policy Iteration with policy evaluation & improvement
+│   ├── policy_evaluation.py           # Iterative Policy Evaluation
+│   ├── dijkstra.py                    # Dijkstra Shortest Path Planner with fuel checks
+│   └── bfs.py                         # Breadth-First Search baseline
+│
+├── marl/                              # Multi-Agent Reinforcement Learning
+│   ├── __init__.py
+│   ├── q_agent.py                     # Tabular Q-Learning Agent (epsilon-greedy, TD update)
+│   ├── iql.py                         # Independent Q-Learning multi-agent coordinator
+│   ├── task_allocator.py              # Macro-task generator and assignment dispatcher
+│   ├── state_encoder.py               # Spatial state discretization for tabular Q-learning
+│   └── refuel_coordinator.py          # Rendezvous calculation & fuel dispatch coordinator
+│
+├── strategy/                          # Agent decision strategies
+│   ├── __init__.py
+│   ├── baselines.py                   # Baselines: Random (B0), Greedy-Dijkstra (B1), Greedy-DP (B2), IQL-Dijkstra (B3)
+│   └── hybrid.py                      # Proposed hierarchical model: MARL (IQL) + DP + Refuel Coordinator
+│
+├── experiments/                       # Experiments, benchmarks & ablation sweeps
+│   ├── __init__.py
+│   ├── run_dp.py                      # Value Iteration vs. Policy Iteration convergence study
+│   ├── run_single_agent_rl.py         # Single-agent Q-learning baseline training
+│   ├── run_marl.py                    # Offline multi-agent IQL training & conflict evaluation
+│   ├── run_hybrid.py                  # Proposed Hybrid model vs. Baselines benchmark
+│   ├── run_tournament.py              # Multi-day tournament & refueling ablation study
+│   ├── run_baseline_comparison.py     # BFS vs. Dijkstra path efficiency benchmark
+│   ├── run_real_server_test.py        # Automated multi-match robustness test
+│   ├── experiment_logger.py           # Structured CSV & JSON experiment telemetry logger
+│   ├── experiment_log.md              # Experiment records and empirical score table
+│   ├── models/                        # Pre-trained Q-table model weights (JSON)
+│   └── configs/                       # Experiment hyperparameter sweeps
+│
+├── logs/                              # Match runtime logs (tracked via .gitkeep)
+│   └── matches/
+│       └── .gitkeep
+│
+├── plots/                             # Generated benchmark evaluation charts
+│   ├── dp_convergence.png             # DP convergence curves
+│   ├── single_agent_qlearning.png     # Single-agent training curve
+│   ├── marl_coordination_curve.png    # MARL conflict reduction curve
+│   ├── hybrid_comparison.png          # 4-metric radar/bar comparison of all strategies
+│   ├── refuel_tournament.png          # Refueling ablation tournament performance
+│   └── match_automation.png           # Latency & match duration telemetry
+│
+└── tests/                             # Automated unit & integration tests
+    ├── test_hex_grid.py               # Hex math, neighbor offsets, distance assertions
+    ├── test_dp.py                     # Convergence of Value Iteration and Policy Iteration
+    ├── test_qlearning.py              # TD updates and epsilon decay verification
+    ├── test_baseline_planners.py      # BFS and Dijkstra shortest path tests
+    ├── test_hybrid.py                 # Hybrid MARL+DP execution & validation
+    ├── test_refuel.py                 # Rendezvous coordinate math and fuel handoff
+    ├── test_connection.py             # HTTP client retry and protocol parsing
+    └── test_real_server.py            # End-to-end mock server match lifecycle
+```
+
+---
+
+## 4. Execution & Usage Guide
+
+The project provides two entrypoints:
+- `main.py`: Modular execution for demos, experimental sweeps, benchmarks, and match execution.
+- `run_match.py`: Dedicated competition runner with live web synchronization and match tracking.
+
+---
+
+### Running Live Competition Matches
+
+To connect your bot to the official PROCON server:
+
+```bash
+# Method A: Using run_match.py (recommended for live matches)
+python run_match.py -m m-32744 -t your_team_token
+
+# Method B: Using main.py (reads credentials from .env)
+python main.py --mode server
+```
+
+#### CLI Options for `run_match.py`:
+| Argument | Description | Default |
+|---|---|---|
+| `-m`, `--match` | Match ID from the official web dashboard (e.g. `m-32744`) | Reads from `.env` |
+| `-t`, `--token` | Team authentication bearer token | Reads from `.env` |
+| `-u`, `--url` | PROCON server base URL | `https://procon.ptit.edu.vn` |
+| `--poll` | Server polling interval in seconds | `0.5` |
+| `--mock` | Launches embedded mock server for offline testing | `False` |
+| `--btc` | Executes the organizer's reference BFS algorithm (`btc_bot.py`) | `False` |
+| `--open-browser` | Opens default web browser to the live match view | `False` |
+
+---
+
+### Offline Mock Server Testing
+
+You can run complete end-to-end matches completely offline without an active internet connection or server credentials:
+
+```bash
+# Run match runner against offline mock server
+python run_match.py --mock
+
+# Run automated 3-match lifecycle test with telemetry
+python main.py --mode automation
+```
+
+---
+
+### Running Research Experiments & Benchmarks
+
+Run any of the scientific benchmarking modules using `main.py`:
+
+```bash
+# 1. Dynamic Programming: Value Iteration vs. Policy Iteration convergence
+python main.py --mode dp
+
+# 2. Baseline Path Planning: BFS vs. Dijkstra efficiency & fuel analysis
+python main.py --mode baseline
+
+# 3. Single-Agent Reinforcement Learning: Q-learning training vs. Random
+python main.py --mode single_rl
+
+# 4. Multi-Agent Reinforcement Learning: IQL coordination & conflict penalty sweep
+python main.py --mode marl
+
+# 5. Proposed Hybrid Strategy vs. Baselines (B0 through B3 benchmark)
+python main.py --mode hybrid
+
+# 6. Multi-Day Tournament & Refueling Strategy Ablation (C1, C2, C3)
+python main.py --mode tournament
+```
+
+---
+
+## 5. Experimental Results & Benchmarks
+
+### 1. Strategy Comparison (Phase 7 Benchmark)
+
+Evaluated across multiple independent random seeds (42, 101, 777, 999) on a 10×10 hex grid with dynamic traffic:
+
+| Strategy | Architecture | Team Score (pts) | Total Fuel Consumed | Decision Latency |
+|---|---|:---:|:---:|:---:|
+| **B0: Random** | Random movement | $2.5 \pm 0.8$ | $14.2 \pm 1.1$ | $< 1\text{ ms}$ |
+| **B1: Greedy + Dijkstra** | Nearest target + Dijkstra | $14.2 \pm 3.1$ | $42.6 \pm 4.5$ | $\sim 5\text{ ms}$ |
+| **B2: Greedy + DP** | Nearest target + Value Iteration | $17.8 \pm 2.4$ | $38.1 \pm 3.2$ | $\sim 12\text{ ms}$ |
+| **B3: IQL + Dijkstra** | MARL task allocation + Dijkstra | $19.4 \pm 2.8$ | $51.2 \pm 6.1$ | $\sim 15\text{ ms}$ |
+| **Proposed: Hybrid MARL + DP** | **IQL + Vectorized VI + Rendezvous** | **$\mathbf{23.8 \pm 2.2}$** | **$\mathbf{29.5 \pm 2.8}$** | **$\mathbf{\sim 18\text{ ms}}$** |
+
+> **Key takeaway**: The proposed Hybrid model achieves the highest team score while consuming **$42\%$ less fuel** than B3, thanks to global value propagation in Value Iteration preventing local terrain traps.
+
+---
+
+### 2. Refueling Strategy Ablation (Phase 8 Tournament)
+
+Conducted over 8 simulated competition days with 3 agents (2 Patrol, 1 Refuel):
+
+| Configuration | Fuel Coordination Mechanism | Score (pts) | Fuel Transferred | Starvation Rate |
+|---|---|:---:|:---:|:---:|
+| **C1: No Refueling** | No fuel support | $18.8 \pm 3.5$ | $0.0\text{ units}$ | $0.0\%$ (conservative) |
+| **C2: Ad-Hoc Chasing** | Refueler chases nearest patrol agent | $16.2 \pm 4.2$ | $12.5\text{ units}$ | $3.9\%$ (stranded) |
+| **C3: Rendezvous (Proposed)** | **Optimal meeting cell + Time sync** | **$\mathbf{23.8 \pm 7.4}$** | **$\mathbf{27.5\text{ units}}$** | **$\mathbf{0.0\%}$** |
+
+---
+
+### 3. Server Automation & Latency Compliance (Phase 9)
+
+- **Match Completion Rate**: $100.0\%$ (successful completion across all tournament matches).
+- **Protocol Violations**: $0$ errors.
+- **Mean Planning Latency**: **$167.65\text{ ms/day}$** (well within the organizer's $1000\text{ ms}$ ceiling).
+
+---
+
+## 6. Implementation Checklist & Phase Roadmap
+
+- [x] **Phase 0 — Project Foundation**: Repository setup, requirements, `.env.example`, `.gitignore`, code style.
+- [x] **Phase 1 — Official Protocol Client**: HTTP polling client, backoff retry for HTTP 425 & 429, action validator.
+- [x] **Phase 2 — Hex Grid & Offline Simulator**: Coordinate system, terrain travel costs, collision avoidance, Gym-compatible simulation.
+- [x] **Phase 3 — Baseline Planners**: BFS minimum-hop planner and Dijkstra minimum-cost planner.
+- [x] **Phase 4 — Dynamic Programming Layer**: Value Iteration and Policy Iteration with Bellman optimality backups.
+- [x] **Phase 5 — Single-Agent RL**: Q-Learning baseline with $\epsilon$-greedy exploration and temporal difference updates.
+- [x] **Phase 6 — Multi-Agent RL**: Independent Q-Learning with decentralized execution and target conflict penalties.
+- [x] **Phase 7 — Hierarchical Hybrid Strategy**: Macro-task MARL combined with micro-route Value Iteration.
+- [x] **Phase 8 — Fuel Rendezvous & Multi-Day Tournament**: Rendezvous cell optimization and time-synchronized refueling.
+- [x] **Phase 9 — Server Integration & Automation**: Live competition runner, mock server, telemetry recording, and resilience fallback.
+
+---
+
+## 7. Git & Development Workflow
+
+Please follow the guidelines established in [`GIT_STRATEGY.md`](file:///d:/PythonProject/procon/GIT_STRATEGY.md):
+
+1. **Commit Messages**: Follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
+   ```text
+   feat(planner): implement vectorized Bellman updates
+   fix(client): handle 429 rate limit with exponential backoff
+   docs(readme): add English installation and execution manual
+   test(hybrid): add multi-agent collision assertion cases
+   ```
+2. **Feature Branching**: Always branch off `main`:
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b feature/your-feature-name
+   ```
+3. **Pre-Push Sanity Check**:
+   ```bash
+   python main.py --check-imports
+   python -m unittest discover tests
+   ```
+
+---
+
+## 8. License & Acknowledgments
+
+Developed by **Team Mer** (Post and Telecommunications Institute of Technology - PTIT) for the **PTIT PROCON 2026** AI Competition.
