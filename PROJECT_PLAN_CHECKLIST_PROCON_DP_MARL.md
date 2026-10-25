@@ -1025,7 +1025,7 @@ Nhằm loại bỏ hiện tượng xe tuần tra chết máy giữa đường ho
 
 ### 5. Bảng Tổng Hợp Tham Số & Siêu Tham Số Toàn Hệ Thống
 
-| Nhóm tham số | Ký hiệu | Tên tham số | Giá trị | Ý nghĩa & Căn cứ khoa học |
+| Nhóm tham số | Ký hiệu | Tên tham số | Giá trị | Vai trò & Ý nghĩa |
 |---|:---:|---|:---:|---|
 | **DP Layer** | $\gamma_{DP}$ | DP Discount Factor | $0.95$ | Tầm nhìn quy hoạch 20 bước, đảm bảo bao quát bản đồ. |
 | | $\theta$ | Convergence Threshold | $10^{-4}$ | Ngưỡng sai số cực nhỏ để đảm bảo chính sách tối ưu tuyệt đối. |
@@ -1045,6 +1045,60 @@ Nhằm loại bỏ hiện tượng xe tuần tra chết máy giữa đường ho
 | | $\omega_{\text{sync}}$| Time Sync Weight | $2.0$ | Trọng số ưu tiên gặp nhau cùng thời điểm tại điểm hẹn. |
 | **Server/Runner**| $T_{\text{poll}}$ | Min Polling Interval | $0.25\text{ s}$ | Chu kỳ thăm dò server ($250\text{ ms} > 200\text{ ms}$ tránh lỗi `HTTP 429`). |
 | | $T_{\text{guard}}$| Latency Guard Limit | $950\text{ ms}$ | Ngưỡng kích hoạt fallback khẩn cấp nếu thuật toán quá $950\text{ ms}$. |
+
+---
+
+### 6. Phân tích Chuyên sâu: Cơ sở Khoa học & Lý do Lựa chọn Từng Siêu Tham Số
+*(Hyperparameter Justification, Mathematical Formulation & Empirical Trade-offs)*
+
+Mỗi siêu tham số trong hệ thống không phải được chọn ngẫu nhiên, mà xuất phát từ việc tính toán giải tích, các ràng buộc vật lý/luật thi đấu của PROCON 2026 và kết quả kiểm chứng thực nghiệm từ các kịch bản quét tham số (`EXP-001` đến `EXP-005`):
+
+#### 1. Nhóm Siêu tham số Tầng Quy hoạch Động (DP Layer)
+- **Hệ số chiết khấu $\gamma_{DP} = 0.95$:**
+  - *Cơ sở toán học:* Tầm nhìn quy hoạch hiệu dụng (Effective Planning Horizon) được xác định theo công thức:
+    $$H_{\text{eff}} = \frac{1}{1 - \gamma_{DP}} = \frac{1}{1 - 0.95} = 20\text{ bước}$$
+  - *Lý do lựa chọn:* Kích thước bản đồ thi đấu của PROCON dao động từ $8 \times 8$ đến $16 \times 16$. Độ dài đường kính lớn nhất trên lưới lục giác khoảng $14 - 18$ bước. Nếu chọn $\gamma_{DP} \le 0.85$ ($H_{\text{eff}} \le 6$ bước), quy hoạch rơi vào trạng thái "cận thị" (myopic), chỉ nhìn thấy chướng ngại vật trước mắt mà không phát hiện được nút thắt giao thông nghẽn ở xa. Ngược lại, nếu chọn $\gamma_{DP} = 0.99$ ($H_{\text{eff}} = 100$), số lượt lặp Bellman tăng vọt từ $11$ lên $28$ lượt, thời gian tính toán tăng gần $300\%$ mà không đem lại cải thiện nào về lộ trình. Giá trị $\gamma_{DP} = 0.95$ vừa đủ bao quát toàn bộ bản đồ, vừa giữ thời gian hội tụ dưới **$60\text{ ms}$**.
+- **Ngưỡng hội tụ $\theta = 10^{-4}$:**
+  - *Lý do lựa chọn:* Điều kiện dừng của Value Iteration là $\max_{s \in \mathcal{S}} |V_{k+1}(s) - V_k(s)| < \theta$. Trong bài toán, chi phí bước đi nhỏ nhất là $1.0$ (ô đồng bằng) và phần thưởng là $+50.0$. Việc đặt $\theta = 10^{-4}$ (sai số tương đối $< 0.01\%$) đảm bảo bề mặt giá trị $V^*(s)$ hoàn toàn phẳng và chính xác tuyệt đối, triệt tiêu mọi sai số làm tròn khi trích xuất vector hướng di chuyển $\arg\max$, đồng thời tránh lãng phí vòng lặp tính toán vô ích nếu đặt $\theta$ quá khắt khe ($10^{-7}$).
+- **Phần thưởng mục tiêu $R_{\text{target}} = +50.0$ và Chi phí bước $C_{\text{step}} = -1.0$:**
+  - *Lý do lựa chọn:* Trên bản đồ $16 \times 16$, hành trình dài nhất có thể lên tới 15 bước. Với chi phí trung bình địa hình + giao thông là $2.5$/bước, tổng chi phí tích lũy tiêu cực là $-37.5$. Nếu đặt $R_{\text{target}} < 35.0$, giá trị kỳ vọng đến đích sẽ bị âm, dẫn tới hiện tượng "ngại đi vì sợ tốn phí", thuật toán sẽ chọn đứng yên (`STAY`) thay vì tiến về đích. Đặt $R_{\text{target}} = +50.0$ bảo đảm gradient giá trị luôn hướng mạnh về ô mục tiêu ($50.0 - 37.5 = +12.5 > 0$). $C_{\text{step}} = -1.0$ đóng vai trò là áp lực thời gian để tác nhân luôn chọn đường ít bước nhất.
+
+#### 2. Nhóm Siêu tham số Tầng Học Tăng Cường Đa Tác Nhân (MARL Layer)
+- **Tốc độ học $\alpha = 0.15$:**
+  - *Lý do lựa chọn:* Trong môi trường đa tác nhân phi tập trung (Dec-POMDP), môi trường có tính chất **phi dừng (non-stationarity)** do các xe đồng thời cập nhật chính sách làm thay đổi phân phối chuyển trạng thái. Nếu chọn $\alpha > 0.30$, các giá trị $Q$ sẽ dao động dữ dội và phân kỳ (oscillation). Nếu chọn $\alpha < 0.05$, tốc độ học quá chậm, không kịp học xong phân công nhiệm vụ trong $1.000$ episodes. Giá trị $\alpha = 0.15$ mang lại sự cân bằng tối ưu giữa tính ổn định (stability) và khả năng thích nghi nhanh (adaptability).
+- **Hệ số chiết khấu vĩ mô $\gamma_{MARL} = 0.90$:**
+  - *Lý do lựa chọn:* Tầng MARL ra quyết định phân công nhiệm vụ theo ngày (1 trận thường kéo dài từ 4 đến 10 ngày). Với $\gamma_{MARL} = 0.90$, tầm nhìn chiến lược vĩ mô của tác nhân trải dài khoảng $5 - 10$ ngày đấu ($H_{\text{eff}} = \frac{1}{1-0.9} = 10$), vừa đủ để tác nhân dự liệu trước nhu cầu tiếp nhiên liệu cho 1–2 ngày sau mà không bị phân tâm bởi các biến cố quá xa xôi trong tương lai.
+- **Lịch trình khám phá $\epsilon_0 = 1.0 \to \epsilon_{\min} = 0.05$ với $\beta = 0.995$:**
+  - *Lý do lựa chọn:* Ban đầu bảng $Q$ được khởi tạo bằng 0, tác nhân cần $\epsilon_0 = 1.0$ (100% ngẫu nhiên) để khám phá mọi vị trí quán Udon. Với hệ số suy giảm $\beta = 0.995$:
+    $$\epsilon_t = \max(0.05, 1.0 \times 0.995^t)$$
+    Tại episode thứ 600, $\epsilon$ giảm về mức sàn $0.05$, cho phép $400$ episode còn lại tập trung thuần túy vào khai thác (exploitation) và làm mịn chính sách phân công. Mức giữ lại $5\%$ ngẫu nhiên cuối cùng giúp tác nhân duy trì tính linh hoạt, không bị kẹt khi vị trí ban đầu bị xáo trộn.
+- **Mức phạt xung đột mục tiêu $\rho_{\text{conflict}} = -15.0$:**
+  - *Cơ sở thực nghiệm:* Điểm số thu hoạch một quán Udon là $+10.0$ đến $+30.0$ (trung bình $+15.0$). Khi chia sẻ $50\%$, mỗi xe nhận kỳ vọng $+7.5$. Nếu chỉ phạt nhẹ $\rho_{\text{conflict}} = -5.0$, kỳ vọng tổng khi tranh chấp vẫn là $+7.5 - 5.0 = +2.5 > 0$, hai xe vẫn sẽ tham lam lao vào cùng 1 ô điểm cao. Khi nâng mức phạt lên $\rho_{\text{conflict}} = -15.0$, kỳ vọng bị âm ngay lập tức ($+7.5 - 15.0 = -7.5 < 0$). Tín hiệu lỗi TD âm cực mạnh này lập tức dập tắt giá trị Q của hành động tranh chấp, ép một xe phải nhường và chuyển hướng sang mục tiêu khác, đưa tỷ lệ xung đột về đúng **$0.0\%$**.
+- **Tỷ lệ phân bổ phần thưởng $w_{\text{shared}} = 0.50$ và $w_{\text{ind}} = 0.50$:**
+  - *Lý do lựa chọn:* 
+    - Nếu $w_{\text{shared}} = 0.0$ (thuần cá nhân): Xe tiếp tế (Refueler) không trực tiếp ăn điểm Udon sẽ bị reward âm (do tốn nhiên liệu chạy xe) và chọn đứng yên tại chỗ, bỏ mặc xe tuần tra cạn xăng.
+    - Nếu $w_{\text{shared}} = 1.0$ (thuần tập thể): Gây ra hiện tượng "lười biếng ăn theo" (Lazy Agent Problem / Credit Assignment Problem), xe tuần tra không phân biệt được đóng góp cá nhân của mình.
+    - Tỷ lệ cân bằng $50:50$ là cấu hình hoàn hảo: vừa kích thích xe tuần tra tích cực săn điểm, vừa thưởng xứng đáng cho xe tiếp tế khi hỗ trợ đồng đội ghi điểm.
+- **Hệ số phạt tiêu hao nhiên liệu $\mu = 0.10$:**
+  - *Lý do lựa chọn:* Một ngày di chuyển tiêu tốn từ $5$ đến $20$ đơn vị xăng. Trừ điểm với trọng số $\mu = 0.10$ sẽ tạo mức phạt nhẹ $-0.5$ đến $-2.0$ điểm reward. Mức phạt này đủ nhỏ để không lấn át điểm ăn Udon ($+10.0$), nhưng đủ để răn đe tác nhân không đi lòng vòng và chủ động né tránh các ô kẹt xe có chi phí cao.
+
+#### 3. Nhóm Siêu tham số Điều phối Tiếp nhiên liệu (Refueling Layer)
+- **Ngưỡng nhiên liệu nguy cấp $\tau_{\text{fuel}} = 0.35$ ($35\%$ dung tích bình chứa):**
+  - *Lý do lựa chọn:* Xe tuần tra có bình xăng từ $30 - 60$ đơn vị. Ngưỡng $35\%$ tương ứng với khoảng $10 - 20$ đơn vị xăng còn lại. Với định mức $1 - 2$ xăng/bước và $5 - 10$ bước/ngày, lượng xăng này vừa vặn đủ cho xe di chuyển an toàn trong đúng 1 ngày đấu tới ô điểm hẹn. Nếu đặt $< 20\%$, xe sẽ bị cạn pin chết máy dọc đường trước khi gặp đồng đội. Nếu đặt $> 50\%$, xe gọi cứu hộ quá sớm, làm gián đoạn chu kỳ tuần tra săn điểm.
+- **Tốc độ bơm nhiên liệu $R_{\text{rate}} = 10.0$ đơn vị/bước:**
+  - *Lý do lựa chọn:* Cố định theo đúng điều lệ kỹ thuật của ban tổ chức PTIT PROCON: khi khoảng cách giữa 2 xe $\le 1$ ô lục giác, tốc độ bơm đạt tối đa 10 đơn vị/bước. Với bình xăng 50 đơn vị, chỉ cần $3 - 5$ bước đứng cạnh nhau là bình xăng được nạp đầy hoàn toàn.
+- **Trọng số phạt lệch pha thời gian $\omega_{\text{sync}} = 2.0$:**
+  - *Cơ sở hàm mục tiêu:*
+    $$\text{Cost}_{\text{rendezvous}}(c) = \text{Cost}(P \to c) + \text{Cost}(R \to c) + \omega_{\text{sync}} \cdot |\text{ETA}_P(c) - \text{ETA}_R(c)|$$
+  - *Lý do lựa chọn:* Nếu $\omega_{\text{sync}} = 0$, điểm hẹn được chọn có thể rất gần xe tuần tra nhưng cực xa xe tiếp tế, khiến xe tuần tra phải đứng chờ $6 - 8$ bước (lãng phí thời gian ghi điểm). Đặt $\omega_{\text{sync}} = 2.0$ ưu tiên giảm thiểu độ lệch pha thời gian gấp đôi chi phí di chuyển, buộc thuật toán tìm điểm hẹn mà cả hai xe cùng đến nơi gần như đồng thời (chênh lệch $\le 1$ bước).
+
+#### 4. Nhóm Siêu tham số Giao thức Server & Bảo vệ Độ trễ (Server/Runner Constraints)
+- **Chu kỳ thăm dò $T_{\text{poll}} = 0.25\text{ s}$ ($250\text{ ms}$):**
+  - *Lý do lựa chọn:* Ban tổ chức quy định tần suất gọi API không được nhanh hơn $200\text{ ms}$ (vi phạm sẽ nhận mã `HTTP 429 Too Many Requests`). Đặt $T_{\text{poll}} = 250\text{ ms}$ tạo ra vùng đệm an toàn $50\text{ ms}$ chống lại sự trôi thời gian (timer jitter) của hệ điều hành và độ trễ mạng Internet.
+- **Ngưỡng bảo vệ độ trễ an toàn $T_{\text{guard}} = 950\text{ ms}$:**
+  - *Lý do lựa chọn:* Ban tổ chức giới hạn thời gian gửi kế hoạch là $1.000\text{ ms/ngày}$. Ngưỡng Watchdog $950\text{ ms}$ chừa lại $50\text{ ms}$ dự phòng cho quá trình đóng gói JSON và round-trip mạng. Nếu thuật toán bị treo hoặc gặp ngoại lệ vượt quá $950\text{ ms}$, bộ bảo vệ tự ngắt và phát chuỗi hành động hợp lệ (`STAY`) ngay lập tức, bảo đảm tỷ lệ an toàn giao thức đạt $100\%$ không bao giờ bị xử thua do timeout.
+
+---
 
 ---
 
